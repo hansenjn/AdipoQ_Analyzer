@@ -1,6 +1,6 @@
 package adipoQ_analyzer_jnh;
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.0.1
+* AdipoQ Analyzer Version 0.0.2
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -35,13 +35,14 @@ import ij.gui.*;
 import ij.io.*;
 import ij.measure.*;
 import ij.plugin.*;
-import ij.process.LUT;
+import ij.plugin.filter.ParticleAnalyzer;
+import ij.plugin.frame.RoiManager;
 import ij.text.*;
 
 public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "AdipoQ Analyzer";
-	static final String PLUGINVERSION = "0.0.1";
+	static final String PLUGINVERSION = "0.0.2";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -317,8 +318,15 @@ public void run(String arg) {
 			
 			//processing
 			progress.updateBarText("Analyze " + channelID + " ...");
-			ArrayList<Adipocyte> adipocytes = this.analyzeAdipocytes(imp, channelID);
-			
+			ArrayList<Adipocyte> adipocytes = new ArrayList<Adipocyte>(0);
+			if(imp.getNSlices()==1 && imp.getNFrames()==1) {
+				adipocytes = this.analyzeAdipocytesWithRoiManager2DStatic(imp, channelID);	
+				RoiManager.getInstance().runCommand("Save", filePrefix+"r.zip");
+				RoiManager.getInstance().reset();
+				RoiManager.getInstance().setVisible(true);
+			}else {
+				adipocytes = this.analyzeAdipocytes(imp, channelID);				
+			}
 			
 			//Saving
 			tp1 = new TextPanel("results");
@@ -1280,23 +1288,203 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 	return adipos;
 }
 
+/**
+ * @param channel: 1 <= channel <= # channels
+ * */
+private static ImagePlus copyChannel(ImagePlus imp, int channel, boolean adjustDisplayRangeTo16bit, boolean copyOverlay){
+	ImagePlus impNew = IJ.createHyperStack("channel image", imp.getWidth(), imp.getHeight(), 1, imp.getNSlices(), imp.getNFrames(), imp.getBitDepth());
+	int index = 0, indexNew = 0;
+	
+	for(int x = 0; x < imp.getWidth(); x++){
+		for(int y = 0; y < imp.getHeight(); y++){
+			for(int s = 0; s < imp.getNSlices(); s++){
+				for(int f = 0; f < imp.getNFrames(); f++){
+					index = imp.getStackIndex(channel, s+1, f+1)-1;
+					indexNew = impNew.getStackIndex(1, s+1, f+1)-1;
+					impNew.getStack().setVoxel(x, y, indexNew, imp.getStack().getVoxel(x, y, index));
+				}					
+			}
+		}
+	}
+	if(adjustDisplayRangeTo16bit)	impNew.setDisplayRange(0, 4095);
+	if(copyOverlay)	impNew.setOverlay(imp.getOverlay().duplicate());
+	
+	imp.setC(channel);
+   	impNew.setLut(imp.getChannelProcessor().getLut());
+	
+	impNew.setCalibration(imp.getCalibration());
+	return impNew;
+}
 
 /**
  * @return a container that contains adipocyte objects
  * @param imp: Hyperstack image where one channel is binarized or semi-binarized
  * @param c: defines the channel of the Hyperstack image imp, in which the ciliary information is stored 1 <= c <= number of channels
+ * Method for fast particle detection and analysis in a 2D image.
  * */
-ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager (ImagePlus imp, int c){
-	ImagePlus refImp = imp.duplicate();
-	int nrOfPoints = 0;
+ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int c){
+	boolean impShown = imp.isVisible();
+	imp.setC(c);
+	if(impShown) {
+		imp.hide();
+	}
 	
-	Roi r = new Roi(0, 0, 1, 1);
+	ImagePlus refImp = copyChannel(imp, c, false, false);
 	
-	//TODO
+	RoiManager rm = RoiManager.getInstance();
+	if (rm==null) rm = new RoiManager();
+	rm.setVisible(false);
+	rm.runCommand("reset");
 	
-	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>((int)Math.round((double)nrOfPoints/(double)minSize));
+	int pAOptions = ParticleAnalyzer.ADD_TO_MANAGER;
+	if(!increaseRange) {
+		pAOptions += ParticleAnalyzer.FOUR_CONNECTED;		
+	}
+	
+	ParticleAnalyzer pA = new ParticleAnalyzer(pAOptions,
+			0, new ResultsTable(), 0, Double.POSITIVE_INFINITY,
+			0.0, 1.0);
+	pA.analyze(refImp);
+	
+	Roi [] rois = rm.getRoisAsArray().clone();
+	rm.runCommand("reset");
+	
+	refImp.changes = false;
+	refImp.close();
+	
+	//blank image
+	refImp = imp.duplicate();
+	int index;
+	for(int x = 0; x < imp.getWidth(); x++){
+		for(int y = 0; y < imp.getHeight(); y++){
+			for(int s = 0; s < imp.getNSlices(); s++){
+				for(int f = 0; f < imp.getNFrames(); f++){
+					index = imp.getStackIndex(c, s+1, f+1)-1;					
+					imp.getStack().setVoxel(x, y, index, 0.0);
+				}					
+			}
+		}
+	}
 	
 	
+	Roi r;
+	int xStart, xEnd, yStart, yEnd;
+	boolean keep;
+	int included = 0;
+	int nRPart = (int) (rois.length / 100.0);
+	if(nRPart == 0) {
+		nRPart = 1;
+	}
+	
+	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>(rois.length);
+	ArrayList<AdipoPoint> preliminaryParticle;
+	
+	for(int i = 0; i < rois.length; i++) {
+		r = rois [i];
+		
+		xStart = r.getBounds().x - 1;
+		if(xStart < 0) xStart = 0;
+		xEnd = r.getBounds().x + r.getBounds().width + 1;
+		if(xEnd > imp.getWidth()-1)	xEnd = imp.getWidth()-1;
+		yStart = r.getBounds().y - 1;
+		if(yStart < 0) yStart = 0;
+		yEnd = r.getBounds().y + r.getBounds().height + 1;
+		if(yEnd > imp.getHeight() -1)	yEnd = imp.getHeight()-1;
+		
+		preliminaryParticle = new ArrayList<AdipoPoint>(r.getBounds().height*r.getBounds().width);
+		
+		for(int x = xStart; x <= xEnd; x++) {
+			for(int y = yStart; y <= yEnd; y++) {
+				if(r.contains(x, y)) {
+					preliminaryParticle.add(new AdipoPoint(x,y,0,0, refImp, c));
+				}
+			}
+		}
+		
+		//Analysis
+		preliminaryParticle.trimToSize();
+		
+		keep = true;
+		
+		if(preliminaryParticle.size()<minSize) {
+			keep = false;
+		}
+		
+		/**
+		 * Check for touching XYZ
+		 * */
+		if(excludeSelection.equals(excludeOptions[1])){
+			for(int p = 0; p < preliminaryParticle.size(); p++){
+				if(preliminaryParticle.get(p).x==0) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).x==imp.getWidth()-1) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).y==0) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).y==imp.getHeight()-1) {
+					keep = false;
+					break;
+				}								
+			}
+		}else if(excludeSelection.equals(excludeOptions[2])) {
+			for(int p = 0; p < preliminaryParticle.size(); p++){
+				if(preliminaryParticle.get(p).x==0) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).x==imp.getWidth()-1) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).y==0) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).y==imp.getHeight()-1) {
+					keep = false;
+					break;
+				}
+				
+				if(preliminaryParticle.get(p).z==0) {
+					keep = false;
+					break;
+				}else if(preliminaryParticle.get(p).z==imp.getNSlices()-1) {
+					keep = false;
+					break;
+				}	
+			}
+		}
+		
+		if(keep){
+			adipos.add(new Adipocyte(preliminaryParticle, imp));
+			for(int j = 0; j < preliminaryParticle.size(); j++) {
+				imp.getStack().setVoxel(preliminaryParticle.get(j).x,
+						preliminaryParticle.get(j).y, 
+						imp.getStackIndex(c, preliminaryParticle.get(j).z+1, 
+						preliminaryParticle.get(j).t+1)-1, 
+						refImp.getStack().getVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y, 
+								imp.getStackIndex(c, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1));
+			}
+			included++;
+			r.setName("ID " + included);
+			rm.addRoi(r);
+		}
+
+		preliminaryParticle.clear();
+		preliminaryParticle = null;
+
+
+		if(i%nRPart==0){						
+			progress.updateBarText("Reconstruction of particles complete: " + df0.format(i/(double)rois.length*100.0) + "%");
+			progress.addToBar(0.4/((double)rois.length)*nRPart);
+			System.gc();
+		}
+		
+	}
+	
+	if(impShown) {
+		imp.show();
+	}
 	return adipos;
 }
 
