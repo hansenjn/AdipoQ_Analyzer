@@ -1,12 +1,34 @@
 package adipoQ_analyzer_jnh;
+
+/** ===============================================================================
+* AdipoQ Analyzer Version 0.0.1
+* 
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License
+* as published by the Free Software Foundation (http://www.gnu.org/licenses/gpl.txt )
+* 
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*  
+* See the GNU General Public License for more details.
+*  
+* Copyright (C) Jan Niklas Hansen
+* Date: January 12, 2021 (This Version: January 12, 2021)
+*   
+* For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
+* =============================================================================== */
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import ij.ImagePlus;
 
+
 class Adipocyte{
 	int voxelNumber [];	// time
-	private int xySurface [];
-	private int xzyzSurface [];
+	private int xySurface [];	// time
+	private int xzyzSurface [];	// time
 	double centerX []; // time
 	double centerY []; // time
 	double centerZ [];	// time
@@ -119,11 +141,11 @@ class Adipocyte{
 				tempInts = null;
 				System.gc();
 			}
-		}	
+		}
 	}
 	
-	double getSurface(double cal, double zcal, int frame){
-		return (cal*cal*(double)xySurface [frame] + cal*zcal*(double)xzyzSurface [frame]); 
+	double getSurface(double calX, double calY, double zcal, int frame){
+		return (calX*calY*(double)xySurface [frame] + ((calX + calY)/2.0)*zcal*(double)xzyzSurface [frame]); 
 	}
 }
 

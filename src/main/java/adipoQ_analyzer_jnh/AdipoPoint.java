@@ -1,5 +1,25 @@
 package adipoQ_analyzer_jnh;
 
+/** ===============================================================================
+* AdipoQ Analyzer Version 0.0.1
+* 
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License
+* as published by the Free Software Foundation (http://www.gnu.org/licenses/gpl.txt )
+* 
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*  
+* See the GNU General Public License for more details.
+*  
+* Copyright (C) Jan Niklas Hansen
+* Date: January 12, 2021 (This Version: January 12, 2021)
+*   
+* For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
+* =============================================================================== */
+
 import ij.ImagePlus;
 
 class AdipoPoint{
@@ -7,7 +27,6 @@ class AdipoPoint{
 	int y = 0; 
 	int z = 0; 
 	int t = 0;
-	double intensity = 0.0;
 	int xySurface = 0;
 	int xzyzSurface = 0;
 	
@@ -16,7 +35,6 @@ class AdipoPoint{
 	 * pt >= 0 && pt < number of frames
 	 * */
 	public AdipoPoint(int px, int py, int pz, int pt, ImagePlus imp, int channel){
-		intensity = imp.getStack().getVoxel(px, py, imp.getStackIndex(channel, pz+1, pt+1)-1);
 		x = px;
 		y = py;
 		z = pz;
