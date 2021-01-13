@@ -1,6 +1,6 @@
 package adipoQ_analyzer_jnh;
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.0.2
+* AdipoQ Analyzer Version 0.0.3
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package adipoQ_analyzer_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: January 12, 2021 (This Version: January 12, 2021)
+* Date: January 12, 2021 (This Version: January 13, 2021)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -42,7 +42,7 @@ import ij.text.*;
 public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "AdipoQ Analyzer";
-	static final String PLUGINVERSION = "0.0.2";
+	static final String PLUGINVERSION = "0.0.3";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -82,7 +82,7 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 
 	int channelID = 1;
 	int minSize = 100;
-	boolean increaseRange, quantifyCrownLike;
+	boolean increaseRange, fuseParticles, quantifyCrownLike;
 	double refDistance = 1.0;
 	
 	static final String[] excludeOptions = {"nothing", "particles touching x or y borders", "particles touching x or y or z borders"};
@@ -569,6 +569,23 @@ private boolean importSettings() {
 					return false;
 				}
 				
+				line = br.readLine();
+				if(line.contains("Fuse included particles into one for quantification:	TRUE")){
+					fuseParticles = true;
+					IJ.log("Fuse Particles: " + fuseParticles);
+				}else if(line.contains("Fuse included particles into one for quantification:	FALSE")){
+					fuseParticles = false;
+					IJ.log("Fuse Particles: " + fuseParticles);
+				}else {
+					IJ.error("Fuse-particles information missing in file.");
+					return false;
+				}
+				
+				if(quantifyCrownLike && fuseParticles) {
+					new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
+					quantifyCrownLike = false;
+				}
+				
 				break reading;
 			}			
 		}					
@@ -602,6 +619,7 @@ private boolean enterSettings() {
 	gd.setInsets(5,0,0);		gd.addChoice("additionally exclude...", excludeOptions, excludeSelection);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify crown-like structures | reference distance", quantifyCrownLike);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
+	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
 	
 	gd.showDialog();
 	//show Dialog-----------------------------------------------------------------
@@ -614,6 +632,7 @@ private boolean enterSettings() {
 		excludeSelection = gd.getNextChoice();
 		quantifyCrownLike = gd.getNextBoolean();
 		refDistance = gd.getNextNumber();
+		fuseParticles = gd.getNextBoolean();
 	}
 	System.gc();
 	//read and process variables--------------------------------------------------
@@ -621,7 +640,11 @@ private boolean enterSettings() {
 	if (gd.wasCanceled()) return false;
 	
 	if(quantifyCrownLike) {
-		new WaitForUserDialog("Methods to quantify crown-like structures are not yet implemented.").show();
+		new WaitForUserDialog("Note: Methods to quantify crown-like structures are not yet implemented.").show();
+	}
+	if(quantifyCrownLike && fuseParticles) {
+		new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
+		quantifyCrownLike = false;
 	}
 	
 	System.gc();
@@ -688,6 +711,12 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
 		}else{
 			tp.append("	Quantify crown-like structures:	FALSE");
 			tp.append("");
+		}
+		
+		if(fuseParticles){
+			tp.append("	Fuse included particles into one for quantification:	TRUE");
+		}else{
+			tp.append("	Fuse included particles into one for quantification:	FALSE");
 		}
 	}
 	tp.append("");
@@ -1239,7 +1268,9 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 						}
 						
 						if(keep){
-							adipos.add(new Adipocyte(preliminaryParticle, refImp));
+							if(!fuseParticles) {
+								adipos.add(new Adipocyte(preliminaryParticle, refImp));
+							}
 							tempParticles.addAll(preliminaryParticle);
 						}
 
@@ -1267,6 +1298,10 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 	System.gc();
 	
 	tempParticles.trimToSize();
+	
+	if(fuseParticles) {
+		adipos.add(new Adipocyte(tempParticles, refImp));
+	}
 	
 	progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(floodFilledPc)/(double)(nrOfPoints))*100) + "%");
 	progress.addToBar(0.4*((double)(floodFilledPc-floodFilledPcOld)/(double)(nrOfPoints)));
@@ -1410,7 +1445,12 @@ ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int
 	}
 	
 	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>(rois.length);
-	ArrayList<AdipoPoint> preliminaryParticle;
+	ArrayList<AdipoPoint> preliminaryParticle, 
+		fusedParticles = new ArrayList<AdipoPoint>(0);
+	
+	if(fuseParticles) {
+		fusedParticles = new ArrayList<AdipoPoint>(imp.getWidth()*imp.getHeight());
+	}
 	
 	for(int i = 0; i < rois.length; i++) {
 		r = rois [i];
@@ -1489,7 +1529,12 @@ ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int
 		}
 		
 		if(keep){
-			adipos.add(new Adipocyte(preliminaryParticle, imp));
+			if(fuseParticles) {
+				fusedParticles.addAll(preliminaryParticle);
+			}else {
+				adipos.add(new Adipocyte(preliminaryParticle, imp));
+			}
+			
 			for(int j = 0; j < preliminaryParticle.size(); j++) {
 				imp.getStack().setVoxel(preliminaryParticle.get(j).x,
 						preliminaryParticle.get(j).y, 
@@ -1513,6 +1558,10 @@ ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int
 			System.gc();
 		}
 		
+	}
+	
+	if(fuseParticles) {
+		adipos.add(new Adipocyte(fusedParticles, imp));
 	}
 	
 	if(impShown) {
