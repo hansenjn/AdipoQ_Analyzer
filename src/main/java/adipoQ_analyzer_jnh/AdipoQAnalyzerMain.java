@@ -1679,6 +1679,8 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 //				refImp.show();
 //				new WaitForUserDialog("").show();
 				
+				//TODO
+				
 				xStart = roi.getBounds().x - 1;
 				if(xStart < 0) xStart = 0;
 				xEnd = roi.getBounds().x + roi.getBounds().width + 1;
@@ -1690,8 +1692,6 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				
 				preliminaryParticle = new ArrayList<AdipoPoint>(roi.getBounds().height*roi.getBounds().width);
 				tempParticle = new ArrayList<AdipoPoint>(roi.getBounds().height*roi.getBounds().width);
-
-				IJ.doWand(imp, 244, 1293, 0.0, "Legacy");
 				
 				Prefs.blackBackground = false;
 				for(int xi = xStart; xi <= xEnd; xi++) {
@@ -1703,6 +1703,11 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 									IJ.error("wand error: "+xi+" "+yi);
 								}
 								tempRoi = new PolygonRoi(wand.xpoints, wand.ypoints, wand.npoints, Wand.allPoints()?Roi.FREEROI:Roi.TRACED_ROI);
+
+								refImp.setRoi(tempRoi);
+								refImp.show();
+								new WaitForUserDialog("").show();
+								
 								
 								xStart2 = tempRoi.getBounds().x - 1;
 								if(xStart2 < 0) xStart2 = 0;
@@ -1712,6 +1717,11 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 								if(yStart2 < 0) yStart2 = 0;
 								yEnd2 = tempRoi.getBounds().y + tempRoi.getBounds().height + 1;
 								if(yEnd2 > imp.getHeight() -1)	yEnd2 = imp.getHeight()-1;
+								if(xStart2<xStart || yStart2<yStart || xEnd2>xEnd || yEnd2>yEnd){
+									continue;
+								}
+								
+								//TODO
 								
 								for(int xii = xStart2; xii <= xEnd2; xii++) {
 									for(int yii = yStart2; yii <= yEnd2; yii++) {
