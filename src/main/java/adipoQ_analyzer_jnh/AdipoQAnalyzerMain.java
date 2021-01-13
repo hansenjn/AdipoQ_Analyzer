@@ -1317,6 +1317,38 @@ private static ImagePlus copyChannel(ImagePlus imp, int channel, boolean adjustD
 }
 
 /**
+ * @param channel: 1 <= channel <= # channels
+ * */
+private static ImagePlus copyChannelAsBinary(ImagePlus imp, int channel, boolean copyOverlay){
+	ImagePlus impNew = IJ.createHyperStack("channel image", imp.getWidth(), imp.getHeight(), 1, imp.getNSlices(), imp.getNFrames(), 8);
+	int index = 0, indexNew = 0;
+	
+	for(int x = 0; x < imp.getWidth(); x++){
+		for(int y = 0; y < imp.getHeight(); y++){
+			for(int s = 0; s < imp.getNSlices(); s++){
+				for(int f = 0; f < imp.getNFrames(); f++){
+					index = imp.getStackIndex(channel, s+1, f+1)-1;
+					indexNew = impNew.getStackIndex(1, s+1, f+1)-1;
+					if(imp.getStack().getVoxel(x, y, index) > 0.0) {
+						impNew.getStack().setVoxel(x, y, indexNew, 255.0);
+					}else {
+						impNew.getStack().setVoxel(x, y, indexNew, 0.0);
+					}
+				}					
+			}
+		}
+	}
+	impNew.setDisplayRange(0, 255);
+	if(copyOverlay)	impNew.setOverlay(imp.getOverlay().duplicate());
+	
+	imp.setC(channel);
+   	impNew.setLut(imp.getChannelProcessor().getLut());
+	
+	impNew.setCalibration(imp.getCalibration());
+	return impNew;
+}
+
+/**
  * @return a container that contains adipocyte objects
  * @param imp: Hyperstack image where one channel is binarized or semi-binarized
  * @param c: defines the channel of the Hyperstack image imp, in which the ciliary information is stored 1 <= c <= number of channels
@@ -1329,7 +1361,7 @@ ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int
 		imp.hide();
 	}
 	
-	ImagePlus refImp = copyChannel(imp, c, false, false);
+	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
 	
 	RoiManager rm = RoiManager.getInstance();
 	if (rm==null) rm = new RoiManager();
