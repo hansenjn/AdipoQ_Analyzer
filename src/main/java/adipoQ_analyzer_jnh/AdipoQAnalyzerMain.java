@@ -1342,7 +1342,7 @@ private static ImagePlus copyChannelAsBinary(ImagePlus imp, int channel, boolean
 	if(copyOverlay)	impNew.setOverlay(imp.getOverlay().duplicate());
 	
 	imp.setC(channel);
-   	impNew.setLut(imp.getChannelProcessor().getLut());
+//   	impNew.setLut(imp.getChannelProcessor().getLut());
 	
 	impNew.setCalibration(imp.getCalibration());
 	return impNew;
@@ -1362,6 +1362,7 @@ ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int
 	}
 	
 	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
+	Prefs.blackBackground = true;
 	
 	RoiManager rm = RoiManager.getInstance();
 	if (rm==null) rm = new RoiManager();
