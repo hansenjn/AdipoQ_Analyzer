@@ -1834,13 +1834,18 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				System.gc();
 
 //				if(pointsAdded%(pc1000)==0){	
-				if(adipos.size()%10==0){	
-					progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
-					progress.addToBar(0.2/1000.0);
-					System.gc();
-				}	
+//				if(adipos.size()%10==0){	
+//					progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
+//					progress.addToBar(0.2/1000.0);
+//					System.gc();
+//				}	
 			}				
 		}
+		if(x%10==0){	
+			progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
+			progress.addToBar(0.2/(imp.getWidth())*10);
+			System.gc();
+		}	
 	}
 				
 	refImp.changes = false;
