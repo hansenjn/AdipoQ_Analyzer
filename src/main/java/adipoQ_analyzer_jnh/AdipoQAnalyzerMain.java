@@ -1640,7 +1640,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	int pc1000 = nrOfPoints/1000; if (pc1000==0){pc1000 = 1;}
 	int pointsAdded = 0;
 	
-	ArrayList<AdipoPoint> preliminaryParticle, tempParticle;
+	ArrayList<AdipoPoint> preliminaryParticle, tempParticleFill, tempParticleDel;
 	ArrayList<AdipoPoint> fusedParticles = new ArrayList<AdipoPoint>(0);
 	if(fuseParticles) {
 		fusedParticles = new ArrayList<AdipoPoint>(nrOfPoints);
@@ -1657,13 +1657,13 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	rm.runCommand("reset");
 	rm.setVisible(false);
 
-	Wand wand;
+	Wand wand, wand2;
 	int wandMode = Wand.FOUR_CONNECTED;
 	if(increaseRange)	wandMode = Wand.EIGHT_CONNECTED;
 	
 	progress.updateBarText("Connecting " + nrOfPoints + " points ...");
 	
-	Roi roi, tempRoi;
+	Roi roi, tempRoi; Polygon pol, tempPol;
 	for(int x = 0; x < refImp.getWidth(); x++){
 		for(int y = 0; y < refImp.getHeight(); y++){		
 			if(refImp.getStack().getVoxel(x, y, 0) > 0.0){
@@ -1679,8 +1679,6 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 //				refImp.show();
 //				new WaitForUserDialog("").show();
 				
-				//TODO
-				
 				xStart = roi.getBounds().x - 1;
 				if(xStart < 0) xStart = 0;
 				xEnd = roi.getBounds().x + roi.getBounds().width + 1;
@@ -1691,23 +1689,28 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				if(yEnd > imp.getHeight() -1)	yEnd = imp.getHeight()-1;
 				
 				preliminaryParticle = new ArrayList<AdipoPoint>(roi.getBounds().height*roi.getBounds().width);
-				tempParticle = new ArrayList<AdipoPoint>(roi.getBounds().height*roi.getBounds().width);
+				tempParticleFill = new ArrayList<AdipoPoint>(roi.getBounds().height*roi.getBounds().width);
+				tempParticleDel = new ArrayList<AdipoPoint>(roi.getBounds().height*roi.getBounds().width);
 				
 				Prefs.blackBackground = false;
 				for(int xi = xStart; xi <= xEnd; xi++) {
 					for(int yi = yStart; yi <= yEnd; yi++) {
-						if(roi.getPolygon().contains(xi, yi)) {
+						if(roi.contains(xi, yi)) {
 							if(refImp.getStack().getVoxel(xi, yi, 0) == 0.0){
-								wand.autoOutline(xi, yi, 0.0, wandMode);
-								if (wand.npoints==0){
+//								IJ.log("x " + x+ " y " + y + " xi " + xi + " yi " + yi);
+//								rm.setVisible(true);
+//								rm.addRoi(roi);
+								
+								wand2 = new Wand(refImp.getProcessor());
+								wand2.autoOutline(xi, yi, 0.0, wandMode);
+								if (wand2.npoints==0){
 									IJ.error("wand error: "+xi+" "+yi);
 								}
-								tempRoi = new PolygonRoi(wand.xpoints, wand.ypoints, wand.npoints, Wand.allPoints()?Roi.FREEROI:Roi.TRACED_ROI);
+								tempRoi = new PolygonRoi(wand2.xpoints, wand2.ypoints, wand2.npoints, Wand.allPoints()?Roi.FREEROI:Roi.TRACED_ROI);
 
-								refImp.setRoi(tempRoi);
-								refImp.show();
-								new WaitForUserDialog("").show();
-								
+//								refImp.setRoi(tempRoi);
+//								refImp.show();
+//								new WaitForUserDialog("").show();
 								
 								xStart2 = tempRoi.getBounds().x - 1;
 								if(xStart2 < 0) xStart2 = 0;
@@ -1717,19 +1720,20 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 								if(yStart2 < 0) yStart2 = 0;
 								yEnd2 = tempRoi.getBounds().y + tempRoi.getBounds().height + 1;
 								if(yEnd2 > imp.getHeight() -1)	yEnd2 = imp.getHeight()-1;
-								if(xStart2<xStart || yStart2<yStart || xEnd2>xEnd || yEnd2>yEnd){
+								
+								if(xStart2<=xStart || yStart2<=yStart || xEnd2>=xEnd || yEnd2>=yEnd){
 									continue;
 								}
-								
-								//TODO
 								
 								for(int xii = xStart2; xii <= xEnd2; xii++) {
 									for(int yii = yStart2; yii <= yEnd2; yii++) {
 										if(tempRoi.getPolygon().contains(xii, yii)) {
 											if(refImp.getStack().getVoxel(xii, yii, 0) > 0.0){
-												tempParticle.add(new AdipoPoint(xii,yii,0,0, imp, c));
-												refImp.getStack().setVoxel(xii, yii, 0, 0.0);
+												tempParticleFill.add(new AdipoPoint(xii,yii,0,0, imp, c));
+											}else {
+												tempParticleDel.add(new AdipoPoint(xii,yii,0,0, imp, c));
 											}
+											refImp.getStack().setVoxel(xii, yii, 0, 255.0);
 										}
 									}
 								}
@@ -1739,10 +1743,23 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				}
 				Prefs.blackBackground = true;
 				
+				{
+					//remove holes
+					for(int i = 0; i < tempParticleFill.size(); i++) {
+						refImp.getStack().setVoxel(tempParticleFill.get(i).x, tempParticleFill.get(i).y, 0, 0.0);
+					}
+					for(int i = 0; i < tempParticleDel.size(); i++) {
+						refImp.getStack().setVoxel(tempParticleDel.get(i).x, tempParticleDel.get(i).y, 0, 0.0);
+					}
+
+					tempParticleDel.clear();
+					tempParticleDel = null;
+				}
 				
+				//read voxels and transfer to points
 				for(int xi = xStart; xi <= xEnd; xi++) {
 					for(int yi = yStart; yi <= yEnd; yi++) {
-						if(roi.getPolygon().contains(xi, yi)) {
+						if(roi.contains(xi, yi)) {
 							if(refImp.getStack().getVoxel(xi, yi, 0) > 0.0){
 								preliminaryParticle.add(new AdipoPoint(xi,yi,0,0, imp, c));
 								refImp.getStack().setVoxel(xi, yi, 0, 0.0);
@@ -1752,14 +1769,13 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 					}
 				}
 
-				if(tempParticle.size()>0) {
-					//write back to image
-					for(int i = 0; i < tempParticle.size(); i++) {
-						refImp.getStack().setVoxel(tempParticle.get(i).x, tempParticle.get(i).y, 0, 255.0);
+				{
+					//write holes back to image
+					for(int i = 0; i < tempParticleFill.size(); i++) {
+						refImp.getStack().setVoxel(tempParticleFill.get(i).x, tempParticleFill.get(i).y, 0, 255.0);
 					}
-					tempParticle.clear();
-					tempParticle = null;
-					System.gc();
+					tempParticleFill.clear();
+					tempParticleFill = null;
 				}
 				
 				//Analysis
@@ -1794,13 +1810,13 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				if(keep){
 					included++;
 					if(!fuseParticles) {
-						adipos.add(new Adipocyte(preliminaryParticle, imp));
-						if(saveRois) {
-							roi.setName("ID " + included);
-							rm.addRoi(roi);
-						}
+						adipos.add(new Adipocyte(preliminaryParticle, imp));	
 					}else {
 						fusedParticles.addAll(preliminaryParticle);
+					}
+					if(saveRois) {
+						roi.setName("ID " + included);
+						rm.addRoi(roi);
 					}
 				}else {
 					//delete in imp
@@ -1815,9 +1831,11 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 
 				preliminaryParticle.clear();
 				preliminaryParticle = null;
+				System.gc();
 
-				if(pointsAdded%(pc1000)==0){						
-					progress.updateBarText("Reconstruction of ciliary structures complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
+//				if(pointsAdded%(pc1000)==0){	
+				if(adipos.size()%10==0){	
+					progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
 					progress.addToBar(0.2/1000.0);
 					System.gc();
 				}	
@@ -1831,7 +1849,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	
 	if(fuseParticles) {
 		fusedParticles.trimToSize();
-		adipos.add(new Adipocyte(fusedParticles, refImp));
+		adipos.add(new Adipocyte(fusedParticles, imp));
 	}
 		
 	return adipos;
