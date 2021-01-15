@@ -1659,7 +1659,11 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 
 	Wand wand, wand2;
 	int wandMode = Wand.FOUR_CONNECTED;
-	if(increaseRange)	wandMode = Wand.EIGHT_CONNECTED;
+	int wandMode2 = Wand.EIGHT_CONNECTED;
+	if(increaseRange) {
+		wandMode = Wand.EIGHT_CONNECTED;
+		wandMode2 = Wand.FOUR_CONNECTED;
+	}
 	
 	progress.updateBarText("Connecting " + nrOfPoints + " points ...");
 	
@@ -1702,7 +1706,8 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 //								rm.addRoi(roi);
 								
 								wand2 = new Wand(refImp.getProcessor());
-								wand2.autoOutline(xi, yi, 0.0, wandMode);
+								wand2.autoOutline(xi, yi, 0.0, wandMode2);
+								
 								if (wand2.npoints==0){
 									IJ.error("wand error: "+xi+" "+yi);
 								}
