@@ -1,6 +1,6 @@
 package adipoQ_analyzer_jnh;
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.0.3
+* AdipoQ Analyzer Version 0.0.4
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package adipoQ_analyzer_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: January 12, 2021 (This Version: January 13, 2021)
+* Date: January 12, 2021 (This Version: January 19, 2021)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -42,7 +42,7 @@ import ij.text.*;
 public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "AdipoQ Analyzer";
-	static final String PLUGINVERSION = "0.0.3";
+	static final String PLUGINVERSION = "0.0.4";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -76,6 +76,8 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	
 	static final String[] outputVariant = {"save as filename + suffix 'AQA'", "save as filename + suffix 'AQA' + date"};
 	String chosenOutputName = outputVariant[0];
+	boolean keepAwake = false;
+	
 	
 	static final String[] nrFormats = {"US (0.00...)", "Germany (0,00...)"};
 	String ChosenNumberFormat = nrFormats[0];
@@ -90,7 +92,7 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//-----------------define params-----------------
 	
 	//Variables for processing of an individual task
-//		enum channelType {PLAQUE,CELL,NEURITE};
+	Robot robo;
 	
 public void run(String arg) {
 
@@ -111,6 +113,7 @@ public void run(String arg) {
 	gd.setInsets(5,0,0);	gd.addChoice("Output image name: ", outputVariant, chosenOutputName);
 	gd.setInsets(5,0,0);	gd.addChoice("output number format", nrFormats, nrFormats[0]);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Save rois in 2D static mode", saveRois);
+	gd.setInsets(5,0,0);	gd.addCheckbox("Keep computer awake during analysis", keepAwake);
 	
 	gd.showDialog();
 	//show Dialog-----------------------------------------------------------------
@@ -131,6 +134,7 @@ public void run(String arg) {
 		df0.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.GERMANY));
 	}
 	saveRois = gd.getNextBoolean();
+	keepAwake = gd.getNextBoolean();
 	
 	//read and process variables--------------------------------------------------
 	if (gd.wasCanceled()) return;
@@ -234,6 +238,14 @@ public void run(String arg) {
    	ImagePlus imp;
    	TextPanel tp1, tp2;
    	Date startDate, endDate;
+   	
+   	if(keepAwake) {
+   		try {
+			robo = new Robot();
+		} catch (AWTException e) {
+			progress.notifyMessage("Robot that moves the mouse to keep the computer awake could not be hired - Stay-awake-mode was disabled.", ProgressDialog.NOTIFICATION);
+		}
+   	}
    	
 	for(int task = 0; task < tasks; task++){
 		running: while(continueProcessing){
@@ -378,6 +390,9 @@ public void run(String arg) {
 			double volume, surface, sphereRadius, sphereSurface;
 			imp.setOverlay(new Overlay());
 			for(int i = 0; i < adipocytes.size(); i++) {
+				if(keepAwake) {
+					stayAwake();
+				}
 				{
 					//write ID into image
 					txtID = new TextRoi((int)Math.round(adipocytes.get(i).centerX[0]), 
@@ -734,12 +749,14 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
  * @param c: defines the channel of the Hyperstack image imp, in which the ciliary information is stored 1 <= c <= number of channels
  * */
 ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
+	if(keepAwake) stayAwake();
 	ImagePlus refImp = imp.duplicate();
 	int nrOfPoints = 0;
 	
 	for(int z = 0; z < imp.getNSlices(); z++){
 		for(int t = 0; t < imp.getNFrames(); t++){
 			for(int x = 0; x < imp.getWidth(); x++){
+				if(keepAwake) stayAwake();
 				for(int y = 0; y < imp.getHeight(); y++){	
 					if(imp.getStack().getVoxel(x, y, imp.getStackIndex(c, z+1, t+1)-1) > 0.0){
 						nrOfPoints++;
@@ -1293,6 +1310,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 					}				
 				}	
 			}
+			if(keepAwake) stayAwake();
 			if(floodFilledPc==nrOfPoints){					
 				break searchCells;
 			}
@@ -1619,6 +1637,7 @@ ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int
 }
 
 ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
+	if(keepAwake) stayAwake();
 	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
 	Prefs.blackBackground = true;
 	
@@ -1632,6 +1651,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				nrOfPoints++;
 			}
 		}
+		if(keepAwake) stayAwake();
 	}
 	
 	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>((int)Math.round((double)nrOfPoints/(double)minSize));
@@ -1669,7 +1689,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	
 	Roi roi, tempRoi; Polygon pol, tempPol;
 	for(int x = 0; x < refImp.getWidth(); x++){
-		for(int y = 0; y < refImp.getHeight(); y++){		
+		for(int y = 0; y < refImp.getHeight(); y++){	
 			if(refImp.getStack().getVoxel(x, y, 0) > 0.0){
 				wand = new Wand(refImp.getProcessor());
 				wand.autoOutline(x, y, 1.0, Math.pow(2.0,refImp.getBitDepth())-1, wandMode);
@@ -1850,7 +1870,8 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 			progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
 			progress.addToBar(0.2/(imp.getWidth())*10);
 			System.gc();
-		}	
+		}
+		if(keepAwake) stayAwake();
 	}
 				
 	refImp.changes = false;
@@ -1863,6 +1884,10 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	}
 		
 	return adipos;
+}
+
+private void stayAwake() {
+	robo.mouseMove(MouseInfo.getPointerInfo().getLocation().x, MouseInfo.getPointerInfo().getLocation().y);
 }
 
 }//end main class
