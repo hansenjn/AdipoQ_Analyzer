@@ -85,7 +85,7 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	int channelID = 1;
 	int minSize = 100;
 	boolean increaseRange, fuseParticles, quantifyCrownLike, saveRois;
-	double refDistance = 1.0;
+	double refDistance = 20.0;
 	
 	static final String[] excludeOptions = {"nothing", "particles touching x or y borders", "particles touching x or y or z borders"};
 	String excludeSelection = excludeOptions [1];	//TODO
@@ -383,6 +383,9 @@ public void run(String arg) {
 				appText += "	" +"C" + (c+1) +  ": Min Intensity";
 				appText += "	" +"C" + (c+1) +  ": Max Intensity";
 			}
+			
+			//TODO CLS Output for 2D images
+			
 			tp1.append(appText);
 			tp2.append(appText + this.getOneRowFooter(startDate));
 			
@@ -458,6 +461,8 @@ public void run(String arg) {
 			tp2.saveAs(filePrefix + "s.txt");
 
 			IJ.saveAsTiff(imp,filePrefix+"_RP.tif");
+			
+			//TODO save a CLS map for CLS parameters, colored by intensities with heatmap (evtl) in PNG
 			
 			progress.updateBarText("Finished ...");
 			System.gc();
@@ -661,7 +666,7 @@ private boolean enterSettings() {
 	if (gd.wasCanceled()) return false;
 	
 	if(quantifyCrownLike) {
-		new WaitForUserDialog("Note: Methods to quantify crown-like structures are not yet implemented.").show();
+		new WaitForUserDialog("Note: Methods to quantify crown-like structures in 3D images, 3D time-lapse images, and 2D time-lapse images are not yet implemented.").show();
 	}
 	if(quantifyCrownLike && fuseParticles) {
 		new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
@@ -726,9 +731,9 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
 		
 		tp.append("	Exclude option:	" + excludeSelection);
 		
-		if(increaseRange){
+		if(quantifyCrownLike){
 			tp.append("	Quantify crown-like structures:	TRUE");
-			tp.append("	Crown-like: reference distance:	" + df0.format(refDistance));
+			tp.append("	Crown-like: reference distance:	" + df6.format(refDistance));
 		}else{
 			tp.append("	Quantify crown-like structures:	FALSE");
 			tp.append("");
@@ -1292,7 +1297,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 						
 						if(keep){
 							if(!fuseParticles) {
-								adipos.add(new Adipocyte(preliminaryParticle, refImp));
+								adipos.add(new Adipocyte(preliminaryParticle, refImp, channelID, false, 0.0, null));
 							}
 							tempParticles.addAll(preliminaryParticle);
 						}
@@ -1324,7 +1329,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 	tempParticles.trimToSize();
 	
 	if(fuseParticles) {
-		adipos.add(new Adipocyte(tempParticles, refImp));
+		adipos.add(new Adipocyte(tempParticles, refImp, channelID, false, 0.0, null));
 	}
 	
 	progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(floodFilledPc)/(double)(nrOfPoints))*100) + "%");
@@ -1405,235 +1410,6 @@ private static ImagePlus copyChannelAsBinary(ImagePlus imp, int channel, boolean
 	
 	impNew.setCalibration(imp.getCalibration());
 	return impNew;
-}
-
-/**
- * @deprecated from version v0.0.3 on - because was buggy
- * @return a container that contains adipocyte objects
- * @param imp: Hyperstack image where one channel is binarized or semi-binarized
- * @param c: defines the channel of the Hyperstack image imp, in which the ciliary information is stored 1 <= c <= number of channels
- * Method for fast particle detection and analysis in a 2D image.
- * */
-ArrayList<Adipocyte> analyzeAdipocytesWithRoiManager2DStatic (ImagePlus imp, int c){
-	boolean impShown = imp.isVisible();
-	imp.setC(c);
-	imp.deleteRoi();
-	if(impShown) {
-		imp.hide();
-	}
-	
-	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
-	Prefs.blackBackground = true;
-	
-	RoiManager rm = RoiManager.getInstance();
-	if (rm==null) rm = new RoiManager();
-	rm.runCommand("reset");
-	rm.setVisible(false);
-	
-	int pAOptions = ParticleAnalyzer.ADD_TO_MANAGER;
-	if(!increaseRange) {
-		pAOptions += ParticleAnalyzer.FOUR_CONNECTED;		
-	}
-	
-	ParticleAnalyzer pA = new ParticleAnalyzer(pAOptions,
-			0, new ResultsTable(), 0, Double.POSITIVE_INFINITY,
-			0.0, 1.0);
-	ParticleAnalyzer.setRoiManager(rm);
-	if(!pA.analyze(refImp)) {
-		progress.notifyMessage("Error in particle analysis", ProgressDialog.ERROR);
-	}
-	PolygonRoi [] rois;
-	{
-		Roi [] roisTemp = rm.getRoisAsArray();
-		IJ.log("Rois detected: " + roisTemp.length);
-		boolean duplicated [] = new boolean [roisTemp.length];
-		Arrays.fill(duplicated, false);
-		int counter = 0;
-		for(int r = 0; r < roisTemp.length; r++) {
-			if(duplicated[r]) continue;
-			for(int q = 0; q < roisTemp.length; q++) {
-				if(q!=r && roisTemp[r].equals(roisTemp[q])) {
-					duplicated [q] = true;
-					counter++;
-//					Roi roi = rois[r];
-//					IJ.log(r + " equal:" + roi.getBounds().x + ", " + roi.getBounds().y + ", " + roi.getBounds().width + ", " + roi.getBounds().height);
-//					roi = rois[q];
-//					IJ.log(" to " + q + ":" + roi.getBounds().x + ", " + roi.getBounds().y + ", " + roi.getBounds().width + ", " + roi.getBounds().height);
-				}
-				
-			}
-		}
-		IJ.log("Duplicated: " + counter);
-		
-		rois = new PolygonRoi [roisTemp.length - counter];
-		counter = 0;
-		for(int r = 0; r < roisTemp.length; r++) {
-			if(duplicated[r]) continue;
-			rois [counter] = (PolygonRoi) (roisTemp [r]);
-			counter++;
-		}
-		
-		IJ.log("Remaining: " + rois.length);
-	}
-	
-	rm.runCommand("reset");
-	
-	refImp.changes = false;
-	refImp.close();
-	
-	//blank image
-	refImp = imp.duplicate();
-	int index;
-	for(int x = 0; x < imp.getWidth(); x++){
-		for(int y = 0; y < imp.getHeight(); y++){
-			for(int s = 0; s < imp.getNSlices(); s++){
-				for(int f = 0; f < imp.getNFrames(); f++){
-					index = imp.getStackIndex(c, s+1, f+1)-1;					
-					imp.getStack().setVoxel(x, y, index, 0.0);
-				}					
-			}
-		}
-	}
-	
-	
-	PolygonRoi r;
-	int xStart, xEnd, yStart, yEnd;
-	boolean keep;
-	int included = 0;
-	int nRPart = (int) (rois.length / 100.0);
-	if(nRPart == 0) {
-		nRPart = 1;
-	}
-	
-	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>(rois.length);
-	ArrayList<AdipoPoint> preliminaryParticle, 
-		fusedParticles = new ArrayList<AdipoPoint>(0);
-	
-	if(fuseParticles) {
-		fusedParticles = new ArrayList<AdipoPoint>(imp.getWidth()*imp.getHeight());
-	}
-	
-	for(int i = 0; i < rois.length; i++) {
-		r = rois [i];
-		
-		xStart = r.getBounds().x - 1;
-		if(xStart < 0) xStart = 0;
-		xEnd = r.getBounds().x + r.getBounds().width + 1;
-		if(xEnd > imp.getWidth()-1)	xEnd = imp.getWidth()-1;
-		yStart = r.getBounds().y - 1;
-		if(yStart < 0) yStart = 0;
-		yEnd = r.getBounds().y + r.getBounds().height + 1;
-		if(yEnd > imp.getHeight() -1)	yEnd = imp.getHeight()-1;
-		
-		preliminaryParticle = new ArrayList<AdipoPoint>(r.getBounds().height*r.getBounds().width);
-		
-		for(int x = xStart; x <= xEnd; x++) {
-			for(int y = yStart; y <= yEnd; y++) {
-				if(r.getPolygon().contains(x, y)) {
-					preliminaryParticle.add(new AdipoPoint(x,y,0,0, refImp, c));
-				}
-			}
-		}
-		
-		//Analysis
-		preliminaryParticle.trimToSize();
-		
-		keep = true;
-		
-		if(preliminaryParticle.size()<minSize) {
-			keep = false;
-		}else {
-			/**
-			 * Check for touching XYZ
-			 * */
-			if(excludeSelection.equals(excludeOptions[1])){
-				for(int p = 0; p < preliminaryParticle.size(); p++){
-					if(preliminaryParticle.get(p).x==0) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).x==imp.getWidth()-1) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).y==0) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).y==imp.getHeight()-1) {
-						keep = false;
-						break;
-					}								
-				}
-			}else if(excludeSelection.equals(excludeOptions[2])) {
-				for(int p = 0; p < preliminaryParticle.size(); p++){
-					if(preliminaryParticle.get(p).x==0) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).x==imp.getWidth()-1) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).y==0) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).y==imp.getHeight()-1) {
-						keep = false;
-						break;
-					}
-					
-					if(preliminaryParticle.get(p).z==0) {
-						keep = false;
-						break;
-					}else if(preliminaryParticle.get(p).z==imp.getNSlices()-1) {
-						keep = false;
-						break;
-					}	
-				}
-			}
-		}
-		
-		if(keep){
-			if(fuseParticles) {
-				fusedParticles.addAll(preliminaryParticle);
-			}else {
-				adipos.add(new Adipocyte(preliminaryParticle, imp));
-			}
-			
-			for(int j = 0; j < preliminaryParticle.size(); j++) {
-				imp.getStack().setVoxel(preliminaryParticle.get(j).x,
-						preliminaryParticle.get(j).y, 
-						imp.getStackIndex(c, preliminaryParticle.get(j).z+1, 
-						preliminaryParticle.get(j).t+1)-1, 
-						refImp.getStack().getVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y, 
-								imp.getStackIndex(c, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1));
-			}
-			included++;
-			if(saveRois) {
-				r.setName("ID " + included);
-				rm.addRoi(r);
-			}
-		}
-
-		preliminaryParticle.clear();
-		preliminaryParticle = null;
-
-
-		if(i%nRPart==0){						
-			progress.updateBarText("Reconstruction of particles complete: " + df0.format(i/(double)rois.length*100.0) + "%");
-			progress.addToBar(0.4/((double)rois.length)*nRPart);
-			System.gc();
-		}
-		
-	}
-	
-	if(fuseParticles) {
-		fusedParticles.trimToSize();
-		adipos.add(new Adipocyte(fusedParticles, imp));
-		fusedParticles.clear();
-		fusedParticles = null;
-	}
-	
-	if(impShown) {
-		imp.show();
-	}
-	return adipos;
 }
 
 ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
@@ -1835,7 +1611,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				if(keep){
 					included++;
 					if(!fuseParticles) {
-						adipos.add(new Adipocyte(preliminaryParticle, imp));	
+						adipos.add(new Adipocyte(preliminaryParticle, imp, channelID, quantifyCrownLike, refDistance, roi));	
 					}else {
 						fusedParticles.addAll(preliminaryParticle);
 					}
@@ -1880,14 +1656,52 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	
 	if(fuseParticles) {
 		fusedParticles.trimToSize();
-		adipos.add(new Adipocyte(fusedParticles, imp));
+		adipos.add(new Adipocyte(fusedParticles, imp, channelID, false, 0.0, null));
+		fusedParticles.clear();
+		fusedParticles = null;
 	}
-		
+	System.gc();
 	return adipos;
 }
 
 private void stayAwake() {
 	robo.mouseMove(MouseInfo.getPointerInfo().getLocation().x, MouseInfo.getPointerInfo().getLocation().y);
+}
+
+static double getMaxPercentFromSortedArray(double [] sortedList, double percent){
+	return getAverageOfRange(sortedList,sortedList.length-(int)Math.round(sortedList.length/percent), sortedList.length-1);
+}
+
+static double getMaxPercent(double [] list, double percent){			
+	double [] array = Arrays.copyOf(list, list.length);
+	Arrays.sort(array);
+	double maxTenPercent = getAverageOfRange(array,list.length-(int)Math.round(list.length/percent), list.length-1);
+	array = null;
+	System.gc();
+	return maxTenPercent;
+}
+
+static double getMinPercentFromSortedArray(double [] sortedList, double percent){
+	return getAverageOfRange(sortedList,0,(int)Math.round(sortedList.length/percent)-1);
+}
+
+static double getMinPercent(double [] list, double percent){			
+	double [] array = Arrays.copyOf(list, list.length);
+	Arrays.sort(array);
+	double minTenPercent = getAverageOfRange(array,0,(int)Math.round(array.length/percent)-1);
+	array = null;
+	System.gc();
+	return minTenPercent;
+}
+
+
+
+static double getAverageOfRange(double [] values, int startIndex, int endIndex){
+	double average = 0.0;	
+	for(int x = startIndex; x <= endIndex; x++){
+		average += values [x];
+	}	
+	return (average / (double)(endIndex-startIndex+1));		
 }
 
 }//end main class
