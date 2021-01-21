@@ -1494,9 +1494,9 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	
 	progress.updateBarText("Connecting " + nrOfPoints + " points ...");
 	
-	Roi roi, tempRoi; Polygon pol, tempPol;
+	Roi roi, tempRoi;
 	for(int x = 0; x < refImp.getWidth(); x++){
-		for(int y = 0; y < refImp.getHeight(); y++){	
+		for(int y = 0; y < refImp.getHeight(); y++){
 			if(refImp.getStack().getVoxel(x, y, 0) > 0.0){
 				wand = new Wand(refImp.getProcessor());
 				wand.autoOutline(x, y, 1.0, Math.pow(2.0,refImp.getBitDepth())-1, wandMode);
@@ -1673,7 +1673,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 //				}	
 			}				
 		}
-		if(x%10==0){	
+		if(x%10==0){
 			progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
 			progress.addToBar(0.2/(imp.getWidth())*10);
 			System.gc();
