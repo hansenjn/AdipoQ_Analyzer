@@ -35,7 +35,6 @@ import ij.gui.*;
 import ij.io.*;
 import ij.measure.*;
 import ij.plugin.*;
-import ij.plugin.filter.ParticleAnalyzer;
 import ij.plugin.frame.RoiManager;
 import ij.text.*;
 
@@ -384,7 +383,23 @@ public void run(String arg) {
 				appText += "	" +"C" + (c+1) +  ": Max Intensity";
 			}
 			
-			//TODO CLS Output for 2D images
+			//Output CLS data
+			if(quantifyCrownLike) {
+				appText += "	" + "CLS Voxels";
+				for(int c = 0; c < imp.getNChannels(); c++) {
+					if(c == channelID-1) continue;
+					appText += "	" + "C" + (c+1) + ": CLS Average Intensity";
+					appText += "	" + "C" + (c+1) + ": CLS Integrated Intensity";
+					appText += "	" + "C" + (c+1) + ": CLS Median Intensity";
+					appText += "	" +"C" + (c+1) +  ": CLS SD of Intensities";
+					appText += "	" +"C" + (c+1) +  ": CLS Min Intensity";
+					appText += "	" +"C" + (c+1) +  ": CLS Max Intensity";
+					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Min 5%";
+					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Min 25%";
+					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Max 5%";
+					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Max 25%";
+				}
+			}
 			
 			tp1.append(appText);
 			tp2.append(appText + this.getOneRowFooter(startDate));
@@ -449,6 +464,25 @@ public void run(String arg) {
 						appText += "	" + df6.format(adipocytes.get(i).minIntensity[t][c]);
 						appText += "	" + df6.format(adipocytes.get(i).maxIntensity[t][c]);
 					}
+					
+					if(quantifyCrownLike) {
+						appText += "	" + df6.format(adipocytes.get(i).voxelNumberCLS[t]);
+						for(int c = 0; c < imp.getNChannels(); c++) {
+							if(c == channelID-1) continue;
+
+							appText += "	" + df6.format(adipocytes.get(i).averageIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).integratedIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).medianIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).sdIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).minIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).maxIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).min5pIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).min25pIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).max5pIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).max25pIntensityCLS[t][c]);
+						}
+					}
+					
 					tp1.append(appText);
 					tp2.append(appText);
 				}
@@ -640,7 +674,7 @@ private boolean enterSettings() {
 	//.setInsets(top, left, bottom)
 	gd.setInsets(5,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021 JN Hansen", SuperHeadingFont);
 	gd.setInsets(5,0,0);		gd.addNumericField("Channel Nr (>= 1 & <= nr of channels) for quantification", channelID, 0);
-	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting cilia", increaseRange);	
+	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
 	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size [voxel]", minSize, 0);
 	gd.setInsets(5,0,0);		gd.addChoice("additionally exclude...", excludeOptions, excludeSelection);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify crown-like structures | reference distance", quantifyCrownLike);	
@@ -665,9 +699,6 @@ private boolean enterSettings() {
 	
 	if (gd.wasCanceled()) return false;
 	
-	if(quantifyCrownLike) {
-		new WaitForUserDialog("Note: Methods to quantify crown-like structures in 3D images, 3D time-lapse images, and 2D time-lapse images are not yet implemented.").show();
-	}
 	if(quantifyCrownLike && fuseParticles) {
 		new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
 		quantifyCrownLike = false;
@@ -751,7 +782,7 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
 /**
  * @return a container that contains adipocyte objects
  * @param imp: Hyperstack image where one channel is binarized or semi-binarized
- * @param c: defines the channel of the Hyperstack image imp, in which the ciliary information is stored 1 <= c <= number of channels
+ * @param c: defines the channel of the Hyperstack image imp that shall serve for reconstruction; 1 <= c <= number of channels.
  * */
 ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 	if(keepAwake) stayAwake();
@@ -1297,7 +1328,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 						
 						if(keep){
 							if(!fuseParticles) {
-								adipos.add(new Adipocyte(preliminaryParticle, refImp, channelID, false, 0.0, null));
+								adipos.add(new Adipocyte(preliminaryParticle, refImp, channelID, quantifyCrownLike, refDistance));
 							}
 							tempParticles.addAll(preliminaryParticle);
 						}
@@ -1307,7 +1338,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 
 
 						if(floodFilledPc%(pc100)<pc1000){						
-							progress.updateBarText("Reconstruction of ciliary structures complete: " + df3.format(((double)(floodFilledPc)/(double)(nrOfPoints))*100) + "%");
+							progress.updateBarText("Reconstruction of structures complete: " + df3.format(((double)(floodFilledPc)/(double)(nrOfPoints))*100) + "%");
 							progress.addToBar(0.2*((double)(floodFilledPc-floodFilledPcOld)/(double)(nrOfPoints)));
 							floodFilledPcOld = floodFilledPc;
 							System.gc();
@@ -1329,7 +1360,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 	tempParticles.trimToSize();
 	
 	if(fuseParticles) {
-		adipos.add(new Adipocyte(tempParticles, refImp, channelID, false, 0.0, null));
+		adipos.add(new Adipocyte(tempParticles, refImp, channelID, false, 0.0));
 	}
 	
 	progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(floodFilledPc)/(double)(nrOfPoints))*100) + "%");
@@ -1656,7 +1687,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	
 	if(fuseParticles) {
 		fusedParticles.trimToSize();
-		adipos.add(new Adipocyte(fusedParticles, imp, channelID, false, 0.0, null));
+		adipos.add(new Adipocyte(fusedParticles, imp, channelID, false, 0.0));
 		fusedParticles.clear();
 		fusedParticles = null;
 	}
@@ -1669,26 +1700,26 @@ private void stayAwake() {
 }
 
 static double getMaxPercentFromSortedArray(double [] sortedList, double percent){
-	return getAverageOfRange(sortedList,sortedList.length-(int)Math.round(sortedList.length/percent), sortedList.length-1);
+	return getAverageOfRange(sortedList,sortedList.length-(int)Math.round(sortedList.length/100.0*percent), sortedList.length-1);
 }
 
 static double getMaxPercent(double [] list, double percent){			
 	double [] array = Arrays.copyOf(list, list.length);
 	Arrays.sort(array);
-	double maxTenPercent = getAverageOfRange(array,list.length-(int)Math.round(list.length/percent), list.length-1);
+	double maxTenPercent = getAverageOfRange(array,list.length-(int)Math.round(list.length/100.0*percent), list.length-1);
 	array = null;
 	System.gc();
 	return maxTenPercent;
 }
 
 static double getMinPercentFromSortedArray(double [] sortedList, double percent){
-	return getAverageOfRange(sortedList,0,(int)Math.round(sortedList.length/percent)-1);
+	return getAverageOfRange(sortedList,0,(int)Math.round(sortedList.length/100.0*percent)-1);
 }
 
 static double getMinPercent(double [] list, double percent){			
 	double [] array = Arrays.copyOf(list, list.length);
 	Arrays.sort(array);
-	double minTenPercent = getAverageOfRange(array,0,(int)Math.round(array.length/percent)-1);
+	double minTenPercent = getAverageOfRange(array,0,(int)Math.round(array.length/100.0*percent)-1);
 	array = null;
 	System.gc();
 	return minTenPercent;

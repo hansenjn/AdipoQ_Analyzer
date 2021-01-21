@@ -1,7 +1,7 @@
 package adipoQ_analyzer_jnh;
 
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.0.1
+* AdipoQ Analyzer Version 0.0.4
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -15,18 +15,15 @@ package adipoQ_analyzer_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: January 12, 2021 (This Version: January 12, 2021)
+* Date: January 12, 2021 (This Version: January 19, 2021)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
 
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.plugin.RoiEnlarger;
 
 
@@ -62,10 +59,42 @@ class Adipocyte{
 	 * 1 <= maskC <= imp.getNChannels()
 	 * 
 	 * For the maskC channel, no CLS parameters are determined!
+	 * 
+	 * U
 	 * */
 	public Adipocyte(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean CLS, double refDist, Roi roi){
 		initializeArrays(imp.getNFrames(), imp.getNChannels(), CLS, maskC);
-		determineIntensityParams(points, imp, maskC, CLS, refDist, roi);
+		determineIntensityParams(points, imp);
+		
+		// Quantify Crown Like Structures
+		if(CLS) {
+			if(imp.getNSlices()==1 && imp.getNFrames()==1) {
+				quantifyCrownLikeStructuresIn2DStatic(imp,maskC,refDist,roi);
+			}else {
+				quantifyCrownLikeStructuresIn3DTimelapse(points,imp,maskC,refDist);				
+			}
+			System.gc();
+		}
+	}
+	
+	/**
+	 * pz >= 0 && pz < number of slices
+	 * pt >= 0 && pt < number of frames
+	 * 1 <= maskC <= imp.getNChannels()
+	 * 
+	 * For the maskC channel, no CLS parameters are determined!
+	 * 
+	 * Uses a 3D and/or timelapse implementation to quantify Crown-Like structures
+	 * */
+	public Adipocyte(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean CLS, double refDist){
+		initializeArrays(imp.getNFrames(), imp.getNChannels(), CLS, maskC);
+		determineIntensityParams(points, imp);
+		
+		// Quantify Crown Like Structures
+		if(CLS) {
+			quantifyCrownLikeStructuresIn3DTimelapse(points,imp,maskC,refDist);			
+			System.gc();
+		}
 	}
 	
 	private void initializeArrays(int nFrames, int nChannels, boolean CLS, int maskC) {
@@ -141,7 +170,7 @@ class Adipocyte{
 		}
 	}
 	
-	private void determineIntensityParams(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean CLS, double refDist, Roi roi) {
+	private void determineIntensityParams(ArrayList<AdipoPoint> points, ImagePlus imp) {
 		double tempInt;
 		for(int i = 0; i < points.size(); i++) {
 			voxelNumber [points.get(i).t]++;
@@ -205,154 +234,194 @@ class Adipocyte{
 				System.gc();
 			}
 		}
+	}
+	
+	/**
+	 * 
+	 * */
+	private void quantifyCrownLikeStructuresIn2DStatic(ImagePlus imp, int maskC, double refDist, Roi roi){
+		Roi bigRoi = RoiEnlarger.enlarge(roi, refDist/((imp.getCalibration().pixelWidth+imp.getCalibration().pixelHeight)/2.0));
 		
-		// Quantify Crown Like Structures
-		if(CLS) {
-			Roi bigRoi = RoiEnlarger.enlarge(roi, refDist/((imp.getCalibration().pixelWidth+imp.getCalibration().pixelHeight)/2.0));
-//			double dist;
-			
-//			imp.setRoi(roi);
-//			imp.show();
-//			new WaitForUserDialog("small").show();
-//			imp.hide();
-			
-//			imp.setRoi(bigRoi);
-//			imp.show();
-//			new WaitForUserDialog("big").show();
-//			imp.hide();
-			
-			ArrayList<AdipoPoint> surfacePoints = new ArrayList<AdipoPoint>(points.size());
-			int xMin = Integer.MAX_VALUE, xMax = 0, yMin = Integer.MAX_VALUE, yMax = 0,
-					zMin = Integer.MAX_VALUE, zMax = 0, tMin = Integer.MAX_VALUE, tMax = 0;
-			
-			for(int i = 0; i < points.size(); i++) {
-				if(points.get(i).getSurface(1.0, 1.0) > 0) {
-					surfacePoints.add(points.get(i));
-					if(points.get(i).x < xMin)	xMin = points.get(i).x;
-					if(points.get(i).x > xMax)	xMax = points.get(i).x;
-					if(points.get(i).y < yMin)	yMin = points.get(i).y;
-					if(points.get(i).y > yMax)	yMax = points.get(i).y;
-					if(points.get(i).z < zMin)	zMin = points.get(i).z;
-					if(points.get(i).z > zMax)	zMax = points.get(i).z;
-					if(points.get(i).t < tMin)	tMin = points.get(i).t;
-					if(points.get(i).t > tMax)	tMax = points.get(i).t;
-				}
-			}
-			surfacePoints.trimToSize();
-			
-//			IJ.log(surfacePoints.size() + " / " + points.size());
+		int xMin = Integer.MAX_VALUE, xMax = 0, yMin = Integer.MAX_VALUE, yMax = 0;
 
-			xMin -= Math.round(refDist / imp.getCalibration().pixelWidth) + 1;
-			xMax += Math.round(refDist / imp.getCalibration().pixelWidth) + 1;
-			
-			yMin -= Math.round(refDist / imp.getCalibration().pixelHeight) + 1;
-			yMax += Math.round(refDist / imp.getCalibration().pixelHeight) + 1;
-			
-			zMin -= Math.round(refDist / imp.getCalibration().pixelDepth) + 1;
-			zMax += Math.round(refDist / imp.getCalibration().pixelDepth) + 1;
-			
-			if(xMin < 0) xMin = 0;
-			if(yMin < 0) yMin = 0;
-			if(zMin < 0) zMin = 0;
-			
-			if(xMax > imp.getWidth()-1) xMax = imp.getWidth()-1;
-			if(yMax > imp.getHeight()-1) yMax = imp.getHeight()-1;
-			if(zMax > imp.getNSlices()-1) zMax = imp.getNSlices()-1;
-			
+		xMin = bigRoi.getBounds().x-1;
+		xMax = bigRoi.getBounds().x+bigRoi.getBounds().width+1;
 
-			ArrayList<AdipoPoint> cLSPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)*(1+zMax-zMin)*(1+tMax-tMin)-points.size());
-			for(int x = xMin; x <= xMax; x++) {
-				for(int y = yMin; y <= yMax; y++) {
-					for(int z = zMin; z <= zMax; z++) {
-						for(int t = tMin; t <= tMax; t++) {
-							if(!bigRoi.contains(x,y)) continue;
-							if(roi.contains(x, y)) continue;
-							
-							cLSPoints.add(new AdipoPoint(x, y, z, t, imp, 1));
-						}
-					}
-				}
-			}
-			cLSPoints.trimToSize();
-//			IJ.log(cLSPoints.size() + " cls / " + points.size() + " total");
-			
-			//Quantify CLS intensities
-			{
-				for(int i = 0; i < cLSPoints.size(); i++) {
-					voxelNumberCLS [cLSPoints.get(i).t]++;
-					for(int c = 0; c < averageIntensityCLS[cLSPoints.get(i).t].length; c++) {
-						if(c == maskC-1) continue;
-						
-						tempInt = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
-								imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
-						averageIntensityCLS [cLSPoints.get(i).t][c] += tempInt;
-						integratedIntensityCLS [cLSPoints.get(i).t][c] += tempInt;
-						if(tempInt > maxIntensityCLS [cLSPoints.get(i).t][c])	maxIntensityCLS [cLSPoints.get(i).t][c] = tempInt;
-						if(tempInt < minIntensityCLS [cLSPoints.get(i).t][c])	minIntensityCLS [cLSPoints.get(i).t][c] = tempInt;
-					}
-				}
-				for(int t = 0; t < voxelNumberCLS.length; t++){
-					for(int c = 0; c < averageIntensityCLS[t].length; c++) {
-						if(c == maskC-1) continue;
-						
-						averageIntensityCLS [t][c] /= (double) voxelNumberCLS [t];
-					}
-				}
-				for(int i = 0; i < cLSPoints.size(); i++) {
-					for(int c = 0; c < sdIntensityCLS[cLSPoints.get(i).t].length; c++) {
-						if(c == maskC-1) continue;
-						
-						tempInt = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
-								imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
-						sdIntensityCLS [cLSPoints.get(i).t][c] += Math.pow(tempInt - averageIntensityCLS [cLSPoints.get(i).t][c], 2.0);
-					}
-				}
-				for(int t = 0; t < voxelNumberCLS.length; t++){
-					for(int c = 0; c < averageIntensityCLS[t].length; c++) {
-						if(c == maskC-1) continue;
-						
-						sdIntensityCLS [t][c] /= voxelNumberCLS [t] - 1.0;
-						sdIntensityCLS [t][c] = Math.sqrt(sdIntensityCLS [t][c]);
-					}
-				}
+		yMin = bigRoi.getBounds().y-1;
+		yMax = bigRoi.getBounds().y+bigRoi.getBounds().height+1;
+		
+		if(xMin < 0) xMin = 0;
+		if(yMin < 0) yMin = 0;
+		
+		if(xMax > imp.getWidth()-1) xMax = imp.getWidth()-1;
+		if(yMax > imp.getHeight()-1) yMax = imp.getHeight()-1;
+		
+
+		ArrayList<AdipoPoint> cLSPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)-voxelNumber[0]);
+		for(int x = xMin; x <= xMax; x++) {
+			for(int y = yMin; y <= yMax; y++) {
+				if(!bigRoi.contains(x,y)) continue;
+				if(roi.contains(x, y)) continue;
 				
-				// Calculate median IntensityCLS
-				for(int c = 0; c < imp.getNChannels(); c++) {
-					if(c == maskC-1) continue;
-					for(int t = 0; t < voxelNumberCLS.length; t++){
-						tempInts = new double [voxelNumberCLS[t]];
-						System.gc();
-						
-						counter = 0;
-						for(int i = 0; i < cLSPoints.size(); i++) {
-							if(cLSPoints.get(i).t == t) {
-								tempInts [counter] = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
-										imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
-								counter++;
+				cLSPoints.add(new AdipoPoint(x, y, 0, 0, imp, 1));
+			}
+		}
+		cLSPoints.trimToSize();
+		
+		//Quantify CLS intensities
+		calculateCLSParameters(cLSPoints, imp, maskC);
+		
+		cLSPoints.clear();
+		cLSPoints = null;
+	}
+	
+	/**
+	 * 
+	 * */
+	private void quantifyCrownLikeStructuresIn3DTimelapse(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, double refDist) {
+		int xMin = Integer.MAX_VALUE, xMax = 0, yMin = Integer.MAX_VALUE, yMax = 0,
+				zMin = Integer.MAX_VALUE, zMax = 0, tMin = Integer.MAX_VALUE, tMax = 0;
+		
+		ArrayList<AdipoPoint> surfacePoints = new ArrayList<AdipoPoint>(points.size());
+		for(int i = 0; i < points.size(); i++) {
+			if(points.get(i).getSurface(1.0, 1.0) > 0) {
+				surfacePoints.add(points.get(i));
+				if(points.get(i).x < xMin)	xMin = points.get(i).x;
+				if(points.get(i).x > xMax)	xMax = points.get(i).x;
+				if(points.get(i).y < yMin)	yMin = points.get(i).y;
+				if(points.get(i).y > yMax)	yMax = points.get(i).y;
+				if(points.get(i).z < zMin)	zMin = points.get(i).z;
+				if(points.get(i).z > zMax)	zMax = points.get(i).z;
+				if(points.get(i).t < tMin)	tMin = points.get(i).t;
+				if(points.get(i).t > tMax)	tMax = points.get(i).t;
+			}
+		}
+
+		xMin -= Math.round(refDist / imp.getCalibration().pixelWidth) + 1;
+		xMax += Math.round(refDist / imp.getCalibration().pixelWidth) + 1;
+		
+		yMin -= Math.round(refDist / imp.getCalibration().pixelHeight) + 1;
+		yMax += Math.round(refDist / imp.getCalibration().pixelHeight) + 1;
+		
+		zMin -= Math.round(refDist / imp.getCalibration().pixelDepth) + 1;
+		zMax += Math.round(refDist / imp.getCalibration().pixelDepth) + 1;
+		
+		if(xMin < 0) xMin = 0;
+		if(yMin < 0) yMin = 0;
+		if(zMin < 0) zMin = 0;
+		
+		if(xMax > imp.getWidth()-1) xMax = imp.getWidth()-1;
+		if(yMax > imp.getHeight()-1) yMax = imp.getHeight()-1;
+		if(zMax > imp.getNSlices()-1) zMax = imp.getNSlices()-1;
+		
+
+		ArrayList<AdipoPoint> cLSPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)*(1+zMax-zMin)*(1+tMax-tMin)-points.size());
+		double temp;
+		for(int x = xMin; x <= xMax; x++) {
+			for(int y = yMin; y <= yMax; y++) {
+				for(int z = zMin; z <= zMax; z++) {
+					for(int t = tMin; t <= tMax; t++) {
+						for(int i = 0; i < surfacePoints.size(); i++) {
+							if(t != surfacePoints.get(i).t) continue;
+							
+							//Determine distance to surface
+							temp = Math.sqrt(Math.pow((x-surfacePoints.get(i).x)*imp.getCalibration().pixelWidth, 2.0)
+									+ Math.pow((y-surfacePoints.get(i).y)*imp.getCalibration().pixelHeight,2.0) 
+											+ Math.pow((z-surfacePoints.get(i).z)*imp.getCalibration().pixelDepth, 2.0));
+							
+							//Add if within user-defined range
+							if(temp < refDist) {
+								cLSPoints.add(new AdipoPoint(x, y, z, t, imp, 1));
+								break;
 							}
 						}
-						Arrays.sort(tempInts);
-						if(tempInts.length%2==0){
-							medianIntensityCLS [t][c] = (tempInts[(int)((double)(tempInts.length)/2.0)-1]+tempInts[(int)((double)(tempInts.length)/2.0)])/2.0;
-						}else{
-							medianIntensityCLS [t][c] = tempInts[(int)((double)(tempInts.length)/2.0)];
-						}
-						
-						min25pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempInts, 25.0);
-						min5pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempInts, 5.0); 
-
-						max25pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempInts, 25.0);
-						max5pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempInts, 5.0);
 					}
 				}
 			}
-			
-			surfacePoints.clear();
-			cLSPoints.clear();
-			surfacePoints = null;
-			cLSPoints = null;
-			System.gc();
 		}
+		cLSPoints.trimToSize();
+		surfacePoints.clear();
+		surfacePoints = null;
+		
+		//Quantify CLS intensities
+		calculateCLSParameters(cLSPoints, imp, maskC);
+		
+		cLSPoints.clear();
+		cLSPoints = null;
+	}
+	
+	private void calculateCLSParameters (ArrayList<AdipoPoint> cLSPoints, ImagePlus imp, int maskC) {
+		double temp;
+		for(int i = 0; i < cLSPoints.size(); i++) {
+			voxelNumberCLS [cLSPoints.get(i).t]++;
+			for(int c = 0; c < averageIntensityCLS[cLSPoints.get(i).t].length; c++) {
+				if(c == maskC-1) continue;
+				
+				temp = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
+						imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
+				averageIntensityCLS [cLSPoints.get(i).t][c] += temp;
+				integratedIntensityCLS [cLSPoints.get(i).t][c] += temp;
+				if(temp > maxIntensityCLS [cLSPoints.get(i).t][c])	maxIntensityCLS [cLSPoints.get(i).t][c] = temp;
+				if(temp < minIntensityCLS [cLSPoints.get(i).t][c])	minIntensityCLS [cLSPoints.get(i).t][c] = temp;
+			}
+		}
+		for(int t = 0; t < voxelNumberCLS.length; t++){
+			for(int c = 0; c < averageIntensityCLS[t].length; c++) {
+				if(c == maskC-1) continue;
+				
+				averageIntensityCLS [t][c] /= (double) voxelNumberCLS [t];
+			}
+		}
+		for(int i = 0; i < cLSPoints.size(); i++) {
+			for(int c = 0; c < sdIntensityCLS[cLSPoints.get(i).t].length; c++) {
+				if(c == maskC-1) continue;
+				
+				temp = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
+						imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
+				sdIntensityCLS [cLSPoints.get(i).t][c] += Math.pow(temp - averageIntensityCLS [cLSPoints.get(i).t][c], 2.0);
+			}
+		}
+		for(int t = 0; t < voxelNumberCLS.length; t++){
+			for(int c = 0; c < averageIntensityCLS[t].length; c++) {
+				if(c == maskC-1) continue;
+				
+				sdIntensityCLS [t][c] /= voxelNumberCLS [t] - 1.0;
+				sdIntensityCLS [t][c] = Math.sqrt(sdIntensityCLS [t][c]);
+			}
+		}
+		
+		// Calculate median IntensityCLS
+		double [] tempArray;
+		int counter;
+		for(int c = 0; c < imp.getNChannels(); c++) {
+			if(c == maskC-1) continue;
+			for(int t = 0; t < voxelNumberCLS.length; t++){
+				tempArray = new double [voxelNumberCLS[t]];
+				System.gc();
+				
+				counter = 0;
+				for(int i = 0; i < cLSPoints.size(); i++) {
+					if(cLSPoints.get(i).t == t) {
+						tempArray [counter] = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
+								imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
+						counter++;
+					}
+				}
+				Arrays.sort(tempArray);
+				if(tempArray.length%2==0){
+					medianIntensityCLS [t][c] = (tempArray[(int)((double)(tempArray.length)/2.0)-1]+tempArray[(int)((double)(tempArray.length)/2.0)])/2.0;
+				}else{
+					medianIntensityCLS [t][c] = tempArray[(int)((double)(tempArray.length)/2.0)];
+				}
+				
+				min25pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempArray, 25.0);
+				min5pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempArray, 5.0); 
+
+				max25pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempArray, 25.0);
+				max5pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempArray, 5.0);
+			}
+		}
+		tempArray = null;
 	}
 	
 	double getSurface(double calX, double calY, double zcal, int frame){
