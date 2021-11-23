@@ -675,7 +675,7 @@ private boolean enterSettings() {
 	gd.setInsets(5,0,0);		gd.addNumericField("Channel Nr (>= 1 & <= nr of channels) for quantification", channelID, 0);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
 	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size [voxel]", minSize, 0);
-	gd.setInsets(5,0,0);		gd.addChoice("additionally exclude...", excludeOptions, excludeSelection);
+	gd.setInsets(5,0,0);		gd.addChoice("Additionally exclude...", excludeOptions, excludeSelection);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance", quantifySurroundings);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
