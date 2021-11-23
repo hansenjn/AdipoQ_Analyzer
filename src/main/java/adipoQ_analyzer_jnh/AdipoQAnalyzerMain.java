@@ -385,19 +385,19 @@ public void run(String arg) {
 			
 			//Output Surroundings data
 			if(quantifySurroundings) {
-				appText += "	" + "CLS Voxels";
+				appText += "	" + "Surr Voxels";
 				for(int c = 0; c < imp.getNChannels(); c++) {
 					if(c == channelID-1) continue;
-					appText += "	" + "C" + (c+1) + ": CLS Average Intensity";
-					appText += "	" + "C" + (c+1) + ": CLS Integrated Intensity";
-					appText += "	" + "C" + (c+1) + ": CLS Median Intensity";
-					appText += "	" +"C" + (c+1) +  ": CLS SD of Intensities";
-					appText += "	" +"C" + (c+1) +  ": CLS Min Intensity";
-					appText += "	" +"C" + (c+1) +  ": CLS Max Intensity";
-					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Min 5%";
-					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Min 25%";
-					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Max 5%";
-					appText += "	" +"C" + (c+1) +  ": CLS Average Intensity Max 25%";
+					appText += "	" + "C" + (c+1) + ": Surr Average Intensity";
+					appText += "	" + "C" + (c+1) + ": Surr Integrated Intensity";
+					appText += "	" + "C" + (c+1) + ": Surr Median Intensity";
+					appText += "	" +"C" + (c+1) +  ": Surr SD of Intensities";
+					appText += "	" +"C" + (c+1) +  ": Surr Min Intensity";
+					appText += "	" +"C" + (c+1) +  ": Surr Max Intensity";
+					appText += "	" +"C" + (c+1) +  ": Surr Average Intensity Min 5%";
+					appText += "	" +"C" + (c+1) +  ": Surr Average Intensity Min 25%";
+					appText += "	" +"C" + (c+1) +  ": Surr Average Intensity Max 5%";
+					appText += "	" +"C" + (c+1) +  ": Surr Average Intensity Max 25%";
 				}
 			}
 			
@@ -466,20 +466,20 @@ public void run(String arg) {
 					}
 					
 					if(quantifySurroundings) {
-						appText += "	" + df6.format(adipocytes.get(i).voxelNumberCLS[t]);
+						appText += "	" + df6.format(adipocytes.get(i).voxelNumberSurr[t]);
 						for(int c = 0; c < imp.getNChannels(); c++) {
 							if(c == channelID-1) continue;
 
-							appText += "	" + df6.format(adipocytes.get(i).averageIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).integratedIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).medianIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).sdIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).minIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).maxIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).min5pIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).min25pIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).max5pIntensityCLS[t][c]);
-							appText += "	" + df6.format(adipocytes.get(i).max25pIntensityCLS[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).averageIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).integratedIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).medianIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).sdIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).minIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).maxIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).min5pIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).min25pIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).max5pIntensitySurr[t][c]);
+							appText += "	" + df6.format(adipocytes.get(i).max25pIntensitySurr[t][c]);
 						}
 					}
 					
@@ -496,7 +496,7 @@ public void run(String arg) {
 
 			IJ.saveAsTiff(imp,filePrefix+"_RP.tif");
 			
-			//TODO save a CLS map for CLS parameters, colored by intensities with heatmap (evtl) in PNG
+			//TODO save a Surr map for Surr parameters, colored by intensities with heatmap (evtl) in PNG
 			
 			progress.updateBarText("Finished ...");
 			

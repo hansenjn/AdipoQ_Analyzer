@@ -41,33 +41,33 @@ class Adipocyte{
 	double minIntensity [][];	// time, channels
 	double maxIntensity [][];	// time, channels
 
-	int voxelNumberCLS [];	// time
-	double averageIntensityCLS [][];	// time, channels
-	double integratedIntensityCLS [][];	// time, channels
-	double sdIntensityCLS [][];	// time, channels
-	double medianIntensityCLS [][];	// time, channels
-	double minIntensityCLS [][];	// time, channels
-	double maxIntensityCLS [][];	// time, channels
-	double min25pIntensityCLS [][];	// time, channels
-	double max25pIntensityCLS [][];	// time, channels
-	double min5pIntensityCLS [][];	// time, channels
-	double max5pIntensityCLS [][];	// time, channels
+	int voxelNumberSurr [];	// time
+	double averageIntensitySurr [][];	// time, channels
+	double integratedIntensitySurr [][];	// time, channels
+	double sdIntensitySurr [][];	// time, channels
+	double medianIntensitySurr [][];	// time, channels
+	double minIntensitySurr [][];	// time, channels
+	double maxIntensitySurr [][];	// time, channels
+	double min25pIntensitySurr [][];	// time, channels
+	double max25pIntensitySurr [][];	// time, channels
+	double min5pIntensitySurr [][];	// time, channels
+	double max5pIntensitySurr [][];	// time, channels
 	
 	/**
 	 * pz >= 0 && pz < number of slices
 	 * pt >= 0 && pt < number of frames
 	 * 1 <= maskC <= imp.getNChannels()
 	 * 
-	 * For the maskC channel, no CLS parameters are determined!
+	 * For the maskC channel, no Surr parameters are determined!
 	 * 
 	 * U
 	 * */
-	public Adipocyte(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean CLS, double refDist, Roi roi){
-		initializeArrays(imp.getNFrames(), imp.getNChannels(), CLS, maskC);
+	public Adipocyte(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean Surr, double refDist, Roi roi){
+		initializeArrays(imp.getNFrames(), imp.getNChannels(), Surr, maskC);
 		determineIntensityParams(points, imp);
 		
 		// Quantify Crown Like Structures
-		if(CLS) {
+		if(Surr) {
 			if(imp.getNSlices()==1 && imp.getNFrames()==1) {
 				quantifyCrownLikeStructuresIn2DStatic(imp,maskC,refDist,roi);
 			}else {
@@ -82,22 +82,22 @@ class Adipocyte{
 	 * pt >= 0 && pt < number of frames
 	 * 1 <= maskC <= imp.getNChannels()
 	 * 
-	 * For the maskC channel, no CLS parameters are determined!
+	 * For the maskC channel, no Surr parameters are determined!
 	 * 
 	 * Uses a 3D and/or timelapse implementation to quantify Crown-Like structures
 	 * */
-	public Adipocyte(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean CLS, double refDist){
-		initializeArrays(imp.getNFrames(), imp.getNChannels(), CLS, maskC);
+	public Adipocyte(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, boolean Surr, double refDist){
+		initializeArrays(imp.getNFrames(), imp.getNChannels(), Surr, maskC);
 		determineIntensityParams(points, imp);
 		
 		// Quantify Crown Like Structures
-		if(CLS) {
+		if(Surr) {
 			quantifyCrownLikeStructuresIn3DTimelapse(points,imp,maskC,refDist);			
 			System.gc();
 		}
 	}
 	
-	private void initializeArrays(int nFrames, int nChannels, boolean CLS, int maskC) {
+	private void initializeArrays(int nFrames, int nChannels, boolean Surr, int maskC) {
 		voxelNumber = new int [nFrames];
 		xySurface = new int [nFrames];
 		xzyzSurface = new int [nFrames];
@@ -111,19 +111,19 @@ class Adipocyte{
 		minIntensity  = new double [nFrames][nChannels];	// time, channels
 		maxIntensity  = new double [nFrames][nChannels];	// time, channels
 
-		if(CLS) {
-			voxelNumberCLS = new int [nFrames];
-			voxelNumberCLS = new int [nFrames];
-			averageIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			integratedIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			medianIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			sdIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			minIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			maxIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			min25pIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			max25pIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			min5pIntensityCLS  = new double [nFrames][nChannels];	// time, channels
-			max5pIntensityCLS  = new double [nFrames][nChannels];	// time, channels
+		if(Surr) {
+			voxelNumberSurr = new int [nFrames];
+			voxelNumberSurr = new int [nFrames];
+			averageIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			integratedIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			medianIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			sdIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			minIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			maxIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			min25pIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			max25pIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			min5pIntensitySurr  = new double [nFrames][nChannels];	// time, channels
+			max5pIntensitySurr  = new double [nFrames][nChannels];	// time, channels
 			
 		}
 		
@@ -133,8 +133,8 @@ class Adipocyte{
 		Arrays.fill(centerX, 0.0);
 		Arrays.fill(centerY, 0.0);
 		Arrays.fill(centerZ, 0.0);
-		if(CLS) {
-			Arrays.fill(voxelNumberCLS, 0);
+		if(Surr) {
+			Arrays.fill(voxelNumberSurr, 0);
 		}
 		for(int t = 0; t < nFrames; t++) {
 			Arrays.fill(averageIntensity [t], 0.0);
@@ -144,26 +144,26 @@ class Adipocyte{
 			Arrays.fill(minIntensity [t], Double.POSITIVE_INFINITY);
 			Arrays.fill(maxIntensity [t], Double.NEGATIVE_INFINITY);
 			
-			if(CLS) {
-				for(int c = 0; c < averageIntensityCLS[0].length; c++) {
-					min25pIntensityCLS [t][c] = Double.NaN;
-					max25pIntensityCLS [t][c] = Double.NaN;
-					min5pIntensityCLS [t][c] = Double.NaN;
-					max5pIntensityCLS [t][c] = Double.NaN;
+			if(Surr) {
+				for(int c = 0; c < averageIntensitySurr[0].length; c++) {
+					min25pIntensitySurr [t][c] = Double.NaN;
+					max25pIntensitySurr [t][c] = Double.NaN;
+					min5pIntensitySurr [t][c] = Double.NaN;
+					max5pIntensitySurr [t][c] = Double.NaN;
 					if(c == maskC-1) {
-						averageIntensityCLS [t][c] = Double.NaN;
-						integratedIntensityCLS [t][c] = Double.NaN;
-						medianIntensityCLS [t][c] = Double.NaN;
-						sdIntensityCLS [t][c] = Double.NaN;
-						minIntensityCLS [t][c] = Double.NaN;
-						maxIntensityCLS [t][c] = Double.NaN;
+						averageIntensitySurr [t][c] = Double.NaN;
+						integratedIntensitySurr [t][c] = Double.NaN;
+						medianIntensitySurr [t][c] = Double.NaN;
+						sdIntensitySurr [t][c] = Double.NaN;
+						minIntensitySurr [t][c] = Double.NaN;
+						maxIntensitySurr [t][c] = Double.NaN;
 					}else {
-						averageIntensityCLS [t][c] = 0.0;
-						integratedIntensityCLS [t][c] = 0.0;
-						medianIntensityCLS [t][c] = 0.0;
-						sdIntensityCLS [t][c] = 0.0;
-						minIntensityCLS [t][c] = Double.POSITIVE_INFINITY;
-						maxIntensityCLS [t][c] = Double.NEGATIVE_INFINITY;
+						averageIntensitySurr [t][c] = 0.0;
+						integratedIntensitySurr [t][c] = 0.0;
+						medianIntensitySurr [t][c] = 0.0;
+						sdIntensitySurr [t][c] = 0.0;
+						minIntensitySurr [t][c] = Double.POSITIVE_INFINITY;
+						maxIntensitySurr [t][c] = Double.NEGATIVE_INFINITY;
 					}
 				}
 			}
@@ -257,22 +257,22 @@ class Adipocyte{
 		if(yMax > imp.getHeight()-1) yMax = imp.getHeight()-1;
 		
 
-		ArrayList<AdipoPoint> cLSPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)-voxelNumber[0]);
+		ArrayList<AdipoPoint> surrPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)-voxelNumber[0]);
 		for(int x = xMin; x <= xMax; x++) {
 			for(int y = yMin; y <= yMax; y++) {
 				if(!bigRoi.contains(x,y)) continue;
 				if(roi.contains(x, y)) continue;
 				
-				cLSPoints.add(new AdipoPoint(x, y, 0, 0, imp, 1));
+				surrPoints.add(new AdipoPoint(x, y, 0, 0, imp, 1));
 			}
 		}
-		cLSPoints.trimToSize();
+		surrPoints.trimToSize();
 		
-		//Quantify CLS intensities
-		calculateCLSParameters(cLSPoints, imp, maskC);
+		//Quantify Surr intensities
+		calculateSurrParameters(surrPoints, imp, maskC);
 		
-		cLSPoints.clear();
-		cLSPoints = null;
+		surrPoints.clear();
+		surrPoints = null;
 	}
 	
 	/**
@@ -315,7 +315,7 @@ class Adipocyte{
 		if(zMax > imp.getNSlices()-1) zMax = imp.getNSlices()-1;
 		
 
-		ArrayList<AdipoPoint> cLSPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)*(1+zMax-zMin)*(1+tMax-tMin)-points.size());
+		ArrayList<AdipoPoint> surrPoints = new ArrayList<AdipoPoint>((1+xMax-xMin)*(1+yMax-yMin)*(1+zMax-zMin)*(1+tMax-tMin)-points.size());
 		double temp;
 		for(int x = xMin; x <= xMax; x++) {
 			for(int y = yMin; y <= yMax; y++) {
@@ -331,7 +331,7 @@ class Adipocyte{
 							
 							//Add if within user-defined range
 							if(temp < refDist) {
-								cLSPoints.add(new AdipoPoint(x, y, z, t, imp, 1));
+								surrPoints.add(new AdipoPoint(x, y, z, t, imp, 1));
 								break;
 							}
 						}
@@ -339,86 +339,86 @@ class Adipocyte{
 				}
 			}
 		}
-		cLSPoints.trimToSize();
+		surrPoints.trimToSize();
 		surfacePoints.clear();
 		surfacePoints = null;
 		
-		//Quantify CLS intensities
-		calculateCLSParameters(cLSPoints, imp, maskC);
+		//Quantify Surr intensities
+		calculateSurrParameters(surrPoints, imp, maskC);
 		
-		cLSPoints.clear();
-		cLSPoints = null;
+		surrPoints.clear();
+		surrPoints = null;
 	}
 	
-	private void calculateCLSParameters (ArrayList<AdipoPoint> cLSPoints, ImagePlus imp, int maskC) {
+	private void calculateSurrParameters (ArrayList<AdipoPoint> surrPoints, ImagePlus imp, int maskC) {
 		double temp;
-		for(int i = 0; i < cLSPoints.size(); i++) {
-			voxelNumberCLS [cLSPoints.get(i).t]++;
-			for(int c = 0; c < averageIntensityCLS[cLSPoints.get(i).t].length; c++) {
+		for(int i = 0; i < surrPoints.size(); i++) {
+			voxelNumberSurr [surrPoints.get(i).t]++;
+			for(int c = 0; c < averageIntensitySurr[surrPoints.get(i).t].length; c++) {
 				if(c == maskC-1) continue;
 				
-				temp = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
-						imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
-				averageIntensityCLS [cLSPoints.get(i).t][c] += temp;
-				integratedIntensityCLS [cLSPoints.get(i).t][c] += temp;
-				if(temp > maxIntensityCLS [cLSPoints.get(i).t][c])	maxIntensityCLS [cLSPoints.get(i).t][c] = temp;
-				if(temp < minIntensityCLS [cLSPoints.get(i).t][c])	minIntensityCLS [cLSPoints.get(i).t][c] = temp;
+				temp = imp.getStack().getVoxel(surrPoints.get(i).x, surrPoints.get(i).y, 
+						imp.getStackIndex(c+1, surrPoints.get(i).z+1, surrPoints.get(i).t+1)-1);
+				averageIntensitySurr [surrPoints.get(i).t][c] += temp;
+				integratedIntensitySurr [surrPoints.get(i).t][c] += temp;
+				if(temp > maxIntensitySurr [surrPoints.get(i).t][c])	maxIntensitySurr [surrPoints.get(i).t][c] = temp;
+				if(temp < minIntensitySurr [surrPoints.get(i).t][c])	minIntensitySurr [surrPoints.get(i).t][c] = temp;
 			}
 		}
-		for(int t = 0; t < voxelNumberCLS.length; t++){
-			for(int c = 0; c < averageIntensityCLS[t].length; c++) {
+		for(int t = 0; t < voxelNumberSurr.length; t++){
+			for(int c = 0; c < averageIntensitySurr[t].length; c++) {
 				if(c == maskC-1) continue;
 				
-				averageIntensityCLS [t][c] /= (double) voxelNumberCLS [t];
+				averageIntensitySurr [t][c] /= (double) voxelNumberSurr [t];
 			}
 		}
-		for(int i = 0; i < cLSPoints.size(); i++) {
-			for(int c = 0; c < sdIntensityCLS[cLSPoints.get(i).t].length; c++) {
+		for(int i = 0; i < surrPoints.size(); i++) {
+			for(int c = 0; c < sdIntensitySurr[surrPoints.get(i).t].length; c++) {
 				if(c == maskC-1) continue;
 				
-				temp = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
-						imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
-				sdIntensityCLS [cLSPoints.get(i).t][c] += Math.pow(temp - averageIntensityCLS [cLSPoints.get(i).t][c], 2.0);
+				temp = imp.getStack().getVoxel(surrPoints.get(i).x, surrPoints.get(i).y, 
+						imp.getStackIndex(c+1, surrPoints.get(i).z+1, surrPoints.get(i).t+1)-1);
+				sdIntensitySurr [surrPoints.get(i).t][c] += Math.pow(temp - averageIntensitySurr [surrPoints.get(i).t][c], 2.0);
 			}
 		}
-		for(int t = 0; t < voxelNumberCLS.length; t++){
-			for(int c = 0; c < averageIntensityCLS[t].length; c++) {
+		for(int t = 0; t < voxelNumberSurr.length; t++){
+			for(int c = 0; c < averageIntensitySurr[t].length; c++) {
 				if(c == maskC-1) continue;
 				
-				sdIntensityCLS [t][c] /= voxelNumberCLS [t] - 1.0;
-				sdIntensityCLS [t][c] = Math.sqrt(sdIntensityCLS [t][c]);
+				sdIntensitySurr [t][c] /= voxelNumberSurr [t] - 1.0;
+				sdIntensitySurr [t][c] = Math.sqrt(sdIntensitySurr [t][c]);
 			}
 		}
 		
-		// Calculate median IntensityCLS
+		// Calculate median IntensitySurr
 		double [] tempArray;
 		int counter;
 		for(int c = 0; c < imp.getNChannels(); c++) {
 			if(c == maskC-1) continue;
-			for(int t = 0; t < voxelNumberCLS.length; t++){
-				tempArray = new double [voxelNumberCLS[t]];
+			for(int t = 0; t < voxelNumberSurr.length; t++){
+				tempArray = new double [voxelNumberSurr[t]];
 				System.gc();
 				
 				counter = 0;
-				for(int i = 0; i < cLSPoints.size(); i++) {
-					if(cLSPoints.get(i).t == t) {
-						tempArray [counter] = imp.getStack().getVoxel(cLSPoints.get(i).x, cLSPoints.get(i).y, 
-								imp.getStackIndex(c+1, cLSPoints.get(i).z+1, cLSPoints.get(i).t+1)-1);
+				for(int i = 0; i < surrPoints.size(); i++) {
+					if(surrPoints.get(i).t == t) {
+						tempArray [counter] = imp.getStack().getVoxel(surrPoints.get(i).x, surrPoints.get(i).y, 
+								imp.getStackIndex(c+1, surrPoints.get(i).z+1, surrPoints.get(i).t+1)-1);
 						counter++;
 					}
 				}
 				Arrays.sort(tempArray);
 				if(tempArray.length%2==0){
-					medianIntensityCLS [t][c] = (tempArray[(int)((double)(tempArray.length)/2.0)-1]+tempArray[(int)((double)(tempArray.length)/2.0)])/2.0;
+					medianIntensitySurr [t][c] = (tempArray[(int)((double)(tempArray.length)/2.0)-1]+tempArray[(int)((double)(tempArray.length)/2.0)])/2.0;
 				}else{
-					medianIntensityCLS [t][c] = tempArray[(int)((double)(tempArray.length)/2.0)];
+					medianIntensitySurr [t][c] = tempArray[(int)((double)(tempArray.length)/2.0)];
 				}
 				
-				min25pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempArray, 25.0);
-				min5pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempArray, 5.0); 
+				min25pIntensitySurr [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempArray, 25.0);
+				min5pIntensitySurr [t][c] = AdipoQAnalyzerMain.getMinPercentFromSortedArray(tempArray, 5.0); 
 
-				max25pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempArray, 25.0);
-				max5pIntensityCLS [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempArray, 5.0);
+				max25pIntensitySurr [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempArray, 25.0);
+				max5pIntensitySurr [t][c] = AdipoQAnalyzerMain.getMaxPercentFromSortedArray(tempArray, 5.0);
 			}
 		}
 		tempArray = null;
