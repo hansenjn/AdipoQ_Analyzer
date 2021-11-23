@@ -304,6 +304,11 @@ public class ProgressDialog extends javax.swing.JFrame implements ActionListener
 		bgPanel.updateUI();
 	}
 	
+	public void updateBarText(int task, String text){
+		progressBar.setString("Task " + task + "/" + tasks + ": " + text);
+		bgPanel.updateUI();
+	}
+	
 	public void replaceBarText(String text){			
 		progressBar.setString(text);
 		bgPanel.updateUI();

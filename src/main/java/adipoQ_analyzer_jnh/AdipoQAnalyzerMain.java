@@ -1,6 +1,6 @@
 package adipoQ_analyzer_jnh;
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.0.4
+* AdipoQ Analyzer Version 0.0.5
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package adipoQ_analyzer_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: January 12, 2021 (This Version: January 19, 2021)
+* Date: January 12, 2021 (This Version: November 23, 2021)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -41,7 +41,7 @@ import ij.text.*;
 public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "AdipoQ Analyzer";
-	static final String PLUGINVERSION = "0.0.4";
+	static final String PLUGINVERSION = "0.0.5";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -83,11 +83,11 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 
 	int channelID = 1;
 	int minSize = 100;
-	boolean increaseRange, fuseParticles, quantifyCrownLike, saveRois;
+	boolean increaseRange, fuseParticles, quantifySurroundings, saveRois;
 	double refDistance = 20.0;
 	
 	static final String[] excludeOptions = {"nothing", "particles touching x or y borders", "particles touching x or y or z borders"};
-	String excludeSelection = excludeOptions [1];	//TODO
+	String excludeSelection = excludeOptions [1];
 	//-----------------define params-----------------
 	
 	//Variables for processing of an individual task
@@ -110,7 +110,7 @@ public void run(String arg) {
 	
 	gd.setInsets(10,0,0);	gd.addMessage("GENERAL SETTINGS:", HeadingFont);	
 	gd.setInsets(5,0,0);	gd.addChoice("Output image name: ", outputVariant, chosenOutputName);
-	gd.setInsets(5,0,0);	gd.addChoice("output number format", nrFormats, nrFormats[0]);
+	gd.setInsets(5,0,0);	gd.addChoice("Output number format", nrFormats, nrFormats[0]);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Save rois in 2D static mode", saveRois);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Keep computer awake during analysis", keepAwake);
 	
@@ -383,8 +383,8 @@ public void run(String arg) {
 				appText += "	" +"C" + (c+1) +  ": Max Intensity";
 			}
 			
-			//Output CLS data
-			if(quantifyCrownLike) {
+			//Output Surroundings data
+			if(quantifySurroundings) {
 				appText += "	" + "CLS Voxels";
 				for(int c = 0; c < imp.getNChannels(); c++) {
 					if(c == channelID-1) continue;
@@ -465,7 +465,7 @@ public void run(String arg) {
 						appText += "	" + df6.format(adipocytes.get(i).maxIntensity[t][c]);
 					}
 					
-					if(quantifyCrownLike) {
+					if(quantifySurroundings) {
 						appText += "	" + df6.format(adipocytes.get(i).voxelNumberCLS[t]);
 						for(int c = 0; c < imp.getNChannels(); c++) {
 							if(c == channelID-1) continue;
@@ -499,7 +499,6 @@ public void run(String arg) {
 			//TODO save a CLS map for CLS parameters, colored by intensities with heatmap (evtl) in PNG
 			
 			progress.updateBarText("Finished ...");
-			System.gc();
 			
 			/******************************************************************
 			*** 							Finish							***	
@@ -607,8 +606,8 @@ private boolean importSettings() {
 				
 				line = br.readLine();	
 				if(line.contains("Quantify crown-like structures:	TRUE")){
-					quantifyCrownLike = true;
-					IJ.log("Quantify Crown-Like: " + quantifyCrownLike);
+					quantifySurroundings = true;
+					IJ.log("Quantify Crown-Like: " + quantifySurroundings);
 					
 					line = br.readLine();	
 					if(line.contains("Crown-like: reference distance")){
@@ -621,8 +620,8 @@ private boolean importSettings() {
 						return false;
 					}
 				}else if(line.contains("Quantify crown-like structures:	FALSE")){
-					quantifyCrownLike = false;
-					IJ.log("Quantify Crown-Like: " + quantifyCrownLike);
+					quantifySurroundings = false;
+					IJ.log("Quantify Crown-Like: " + quantifySurroundings);
 					line = br.readLine();	
 				}else {
 					IJ.error("Crown-Like information missing in file.");
@@ -641,9 +640,9 @@ private boolean importSettings() {
 					return false;
 				}
 				
-				if(quantifyCrownLike && fuseParticles) {
+				if(quantifySurroundings && fuseParticles) {
 					new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
-					quantifyCrownLike = false;
+					quantifySurroundings = false;
 				}
 				
 				break reading;
@@ -677,7 +676,7 @@ private boolean enterSettings() {
 	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
 	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size [voxel]", minSize, 0);
 	gd.setInsets(5,0,0);		gd.addChoice("additionally exclude...", excludeOptions, excludeSelection);
-	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify crown-like structures | reference distance", quantifyCrownLike);	
+	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify crown-like structures | reference distance", quantifySurroundings);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
 	
@@ -690,21 +689,19 @@ private boolean enterSettings() {
 		increaseRange = gd.getNextBoolean();
 		minSize = (int) gd.getNextNumber();
 		excludeSelection = gd.getNextChoice();
-		quantifyCrownLike = gd.getNextBoolean();
+		quantifySurroundings = gd.getNextBoolean();
 		refDistance = gd.getNextNumber();
 		fuseParticles = gd.getNextBoolean();
 	}
-	System.gc();
 	//read and process variables--------------------------------------------------
 	
 	if (gd.wasCanceled()) return false;
 	
-	if(quantifyCrownLike && fuseParticles) {
+	if(quantifySurroundings && fuseParticles) {
 		new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
-		quantifyCrownLike = false;
+		quantifySurroundings = false;
 	}
 	
-	System.gc();
 	return true;
 }
 
@@ -762,7 +759,7 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
 		
 		tp.append("	Exclude option:	" + excludeSelection);
 		
-		if(quantifyCrownLike){
+		if(quantifySurroundings){
 			tp.append("	Quantify crown-like structures:	TRUE");
 			tp.append("	Crown-like: reference distance:	" + df6.format(refDistance));
 		}else{
@@ -825,8 +822,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 //						touchesXY = false;
 //						touchesZ = false;
 						
-						preliminaryParticle = new ArrayList<AdipoPoint>(nrOfPoints-floodFilledPc);		
-						System.gc();
+						preliminaryParticle = new ArrayList<AdipoPoint>(nrOfPoints-floodFilledPc);
 						preliminaryParticle.add(new AdipoPoint(x, y, z, t, refImp, c));
 						
 						imp.getStack().setVoxel(x, y, imp.getStackIndex(c, z+1, t+1)-1, 0.0);
@@ -1328,7 +1324,7 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 						
 						if(keep){
 							if(!fuseParticles) {
-								adipos.add(new Adipocyte(preliminaryParticle, refImp, channelID, quantifyCrownLike, refDistance));
+								adipos.add(new Adipocyte(preliminaryParticle, refImp, channelID, quantifySurroundings, refDistance));
 							}
 							tempParticles.addAll(preliminaryParticle);
 						}
@@ -1341,7 +1337,6 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 							progress.updateBarText("Reconstruction of structures complete: " + df3.format(((double)(floodFilledPc)/(double)(nrOfPoints))*100) + "%");
 							progress.addToBar(0.2*((double)(floodFilledPc-floodFilledPcOld)/(double)(nrOfPoints)));
 							floodFilledPcOld = floodFilledPc;
-							System.gc();
 						}	
 					}				
 				}	
@@ -1355,7 +1350,6 @@ ArrayList<Adipocyte> analyzeAdipocytes (ImagePlus imp, int c){
 				
 	refImp.changes = false;
 	refImp.close();
-	System.gc();
 	
 	tempParticles.trimToSize();
 	
@@ -1642,7 +1636,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 				if(keep){
 					included++;
 					if(!fuseParticles) {
-						adipos.add(new Adipocyte(preliminaryParticle, imp, channelID, quantifyCrownLike, refDistance, roi));	
+						adipos.add(new Adipocyte(preliminaryParticle, imp, channelID, quantifySurroundings, refDistance, roi));	
 					}else {
 						fusedParticles.addAll(preliminaryParticle);
 					}
@@ -1663,27 +1657,23 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 
 				preliminaryParticle.clear();
 				preliminaryParticle = null;
-				System.gc();
 
 //				if(pointsAdded%(pc1000)==0){	
 //				if(adipos.size()%10==0){	
 //					progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
 //					progress.addToBar(0.2/1000.0);
-//					System.gc();
 //				}	
 			}				
 		}
 		if(x%10==0){
 			progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(pointsAdded)/(double)(nrOfPoints))*100) + "%");
 			progress.addToBar(0.2/(imp.getWidth())*10);
-			System.gc();
 		}
 		if(keepAwake) stayAwake();
 	}
 				
 	refImp.changes = false;
 	refImp.close();
-	System.gc();
 	
 	if(fuseParticles) {
 		fusedParticles.trimToSize();
@@ -1691,12 +1681,14 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 		fusedParticles.clear();
 		fusedParticles = null;
 	}
-	System.gc();
 	return adipos;
 }
 
 private void stayAwake() {
-	robo.mouseMove(MouseInfo.getPointerInfo().getLocation().x, MouseInfo.getPointerInfo().getLocation().y);
+	try {
+		robo.mouseMove(MouseInfo.getPointerInfo().getLocation().x, MouseInfo.getPointerInfo().getLocation().y);
+	} catch (Exception e) {
+	}
 }
 
 static double getMaxPercentFromSortedArray(double [] sortedList, double percent){
@@ -1708,7 +1700,6 @@ static double getMaxPercent(double [] list, double percent){
 	Arrays.sort(array);
 	double maxTenPercent = getAverageOfRange(array,list.length-(int)Math.round(list.length/100.0*percent), list.length-1);
 	array = null;
-	System.gc();
 	return maxTenPercent;
 }
 
@@ -1721,7 +1712,6 @@ static double getMinPercent(double [] list, double percent){
 	Arrays.sort(array);
 	double minTenPercent = getAverageOfRange(array,0,(int)Math.round(array.length/100.0*percent)-1);
 	array = null;
-	System.gc();
 	return minTenPercent;
 }
 
