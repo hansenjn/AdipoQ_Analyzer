@@ -605,26 +605,26 @@ private boolean importSettings() {
 				}
 				
 				line = br.readLine();	
-				if(line.contains("Quantify crown-like structures:	TRUE")){
+				if(line.contains("Quantify Surrounding:	TRUE")){
 					quantifySurroundings = true;
-					IJ.log("Quantify Crown-Like: " + quantifySurroundings);
+					IJ.log("Quantify Surrounding: " + quantifySurroundings);
 					
 					line = br.readLine();	
-					if(line.contains("Crown-like: reference distance")){
+					if(line.contains("Surrounding: reference distance")){
 						tempString = line.substring(line.lastIndexOf("	")+1);
 						if(tempString.contains(",") && !tempString.contains("."))	tempString = tempString.replace(",", ".");
 						refDistance = Double.parseDouble(tempString);	
-						IJ.log("CrownLike: Reference Distance = " + refDistance);
+						IJ.log("Surrounding: Reference Distance = " + refDistance);
 					}else {
-						IJ.error("Crown-Like Ref Distance missing in file.");
+						IJ.error("Surrounding Ref Distance missing in file.");
 						return false;
 					}
-				}else if(line.contains("Quantify crown-like structures:	FALSE")){
+				}else if(line.contains("Quantify Surrounding:	FALSE")){
 					quantifySurroundings = false;
-					IJ.log("Quantify Crown-Like: " + quantifySurroundings);
+					IJ.log("Quantify Surrounding: " + quantifySurroundings);
 					line = br.readLine();	
 				}else {
-					IJ.error("Crown-Like information missing in file.");
+					IJ.error("Surrounding information missing in file.");
 					return false;
 				}
 				
@@ -641,7 +641,7 @@ private boolean importSettings() {
 				}
 				
 				if(quantifySurroundings && fuseParticles) {
-					new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
+					new WaitForUserDialog("Note: Surrounding will not be quantified as particles are fused into one.").show();
 					quantifySurroundings = false;
 				}
 				
@@ -676,7 +676,7 @@ private boolean enterSettings() {
 	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
 	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size [voxel]", minSize, 0);
 	gd.setInsets(5,0,0);		gd.addChoice("additionally exclude...", excludeOptions, excludeSelection);
-	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify crown-like structures | reference distance", quantifySurroundings);	
+	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance", quantifySurroundings);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
 	
@@ -698,7 +698,7 @@ private boolean enterSettings() {
 	if (gd.wasCanceled()) return false;
 	
 	if(quantifySurroundings && fuseParticles) {
-		new WaitForUserDialog("Note: Crown-like structures will not be quantified as particles are fused into one.").show();
+		new WaitForUserDialog("Note: Surrounding will not be quantified as particles are fused into one.").show();
 		quantifySurroundings = false;
 	}
 	
@@ -760,10 +760,10 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
 		tp.append("	Exclude option:	" + excludeSelection);
 		
 		if(quantifySurroundings){
-			tp.append("	Quantify crown-like structures:	TRUE");
-			tp.append("	Crown-like: reference distance:	" + df6.format(refDistance));
+			tp.append("	Quantify Surrounding:	TRUE");
+			tp.append("	Surrounding: reference distance:	" + df6.format(refDistance));
 		}else{
-			tp.append("	Quantify crown-like structures:	FALSE");
+			tp.append("	Quantify Surrounding:	FALSE");
 			tp.append("");
 		}
 		
