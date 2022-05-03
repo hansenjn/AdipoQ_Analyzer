@@ -69,9 +69,9 @@ class Adipocyte{
 		// Quantify Crown Like Structures
 		if(Surr) {
 			if(imp.getNSlices()==1 && imp.getNFrames()==1) {
-				quantifyCrownLikeStructuresIn2DStatic(imp,maskC,refDist,roi);
+				quantifySurroundingStructuresIn2DStatic(imp,maskC,refDist,roi);
 			}else {
-				quantifyCrownLikeStructuresIn3DTimelapse(points,imp,maskC,refDist);				
+				quantifySurroundingStructuresIn3DTimelapse(points,imp,maskC,refDist);				
 			}
 			System.gc();
 		}
@@ -92,7 +92,7 @@ class Adipocyte{
 		
 		// Quantify Crown Like Structures
 		if(Surr) {
-			quantifyCrownLikeStructuresIn3DTimelapse(points,imp,maskC,refDist);			
+			quantifySurroundingStructuresIn3DTimelapse(points,imp,maskC,refDist);			
 			System.gc();
 		}
 	}
@@ -239,7 +239,7 @@ class Adipocyte{
 	/**
 	 * 
 	 * */
-	private void quantifyCrownLikeStructuresIn2DStatic(ImagePlus imp, int maskC, double refDist, Roi roi){
+	private void quantifySurroundingStructuresIn2DStatic(ImagePlus imp, int maskC, double refDist, Roi roi){
 		Roi bigRoi = RoiEnlarger.enlarge(roi, refDist/((imp.getCalibration().pixelWidth+imp.getCalibration().pixelHeight)/2.0));
 		
 		int xMin = Integer.MAX_VALUE, xMax = 0, yMin = Integer.MAX_VALUE, yMax = 0;
@@ -278,7 +278,7 @@ class Adipocyte{
 	/**
 	 * 
 	 * */
-	private void quantifyCrownLikeStructuresIn3DTimelapse(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, double refDist) {
+	private void quantifySurroundingStructuresIn3DTimelapse(ArrayList<AdipoPoint> points, ImagePlus imp, int maskC, double refDist) {
 		int xMin = Integer.MAX_VALUE, xMax = 0, yMin = Integer.MAX_VALUE, yMax = 0,
 				zMin = Integer.MAX_VALUE, zMax = 0, tMin = Integer.MAX_VALUE, tMax = 0;
 		

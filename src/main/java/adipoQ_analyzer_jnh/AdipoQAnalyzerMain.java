@@ -1,6 +1,6 @@
 package adipoQ_analyzer_jnh;
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.0.6
+* AdipoQ Analyzer Version 0.1.0
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package adipoQ_analyzer_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: January 12, 2021 (This Version: November 23, 2021)
+* Date: January 12, 2021 (This Version: May 03, 2022)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -42,7 +42,7 @@ import ij.text.*;
 public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "AdipoQ Analyzer";
-	static final String PLUGINVERSION = "0.0.6";
+	static final String PLUGINVERSION = "0.1.0";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -84,7 +84,7 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 
 	int channelID = 1;
 	int minSize = 100;
-	boolean increaseRange, fuseParticles, quantifySurroundings, saveRois;
+	boolean increaseRange, fuseParticles, quantifySurroundings, saveRois, saveSurrMaps = false;
 	double refDistance = 20.0;
 	
 	static final String[] excludeOptions = {"nothing", "particles touching x or y borders", "particles touching x or y or z borders"};
@@ -103,7 +103,7 @@ public void run(String arg) {
 	GenericDialog gd = new GenericDialog(PLUGINNAME + " on " + System.getProperty("os.name") + "");	
 	//show Dialog-----------------------------------------------------------------
 	//.setInsets(top, left, bottom)
-	gd.setInsets(0,0,0);	gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021 JN Hansen", SuperHeadingFont);
+	gd.setInsets(0,0,0);	gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021-2022 JN Hansen", SuperHeadingFont);
 	gd.setInsets(5,0,0);	gd.addChoice("process ", taskVariant, selectedTaskVariant);
 	gd.setInsets(0,0,0);	gd.addMessage("The plugin processes .tif images with at least one segmented channel for reconstruction.", InstructionsFont);
 	
@@ -113,6 +113,7 @@ public void run(String arg) {
 	gd.setInsets(5,0,0);	gd.addChoice("Output image name: ", outputVariant, chosenOutputName);
 	gd.setInsets(5,0,0);	gd.addChoice("Output number format", nrFormats, nrFormats[0]);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Save rois in 2D static mode", saveRois);
+	gd.setInsets(5,0,0);	gd.addCheckbox("Save maps for surrounding intensities", saveSurrMaps);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Keep computer awake during analysis", keepAwake);
 	
 	gd.showDialog();
@@ -134,6 +135,7 @@ public void run(String arg) {
 		df0.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.GERMANY));
 	}
 	saveRois = gd.getNextBoolean();
+	saveSurrMaps = gd.getNextBoolean();
 	keepAwake = gd.getNextBoolean();
 	
 	//read and process variables--------------------------------------------------
@@ -337,7 +339,7 @@ public void run(String arg) {
 			if(imp.getNSlices()==1 && imp.getNFrames()==1) {
 //				adipocytes = this.analyzeAdipocytesWithRoiManager2DStatic(imp, channelID);	
 //				adipocytes = this.analyzeAdipocytesIn2DWithWand(imp, channelID);
-				adipocytes = this.analyzeAdipocytesWithParticleManager(imp, channelID);
+				adipocytes = this.analyzeAdipocytesWithParticleManager(imp, channelID, filePrefix);
 				if(saveRois) {
 					RoiManager.getInstance().runCommand("Save", filePrefix+"r.zip");
 					RoiManager.getInstance().reset();
@@ -497,9 +499,7 @@ public void run(String arg) {
 			tp2.saveAs(filePrefix + "s.txt");
 
 			IJ.saveAsTiff(imp,filePrefix+"_RP.tif");
-			
-			//TODO save a Surr map for Surr parameters, colored by intensities with heatmap (evtl) in PNG
-			
+						
 			progress.updateBarText("Finished ...");
 			
 			/******************************************************************
@@ -616,7 +616,7 @@ private boolean importSettings() {
 						tempString = line.substring(line.lastIndexOf("	")+1);
 						if(tempString.contains(",") && !tempString.contains("."))	tempString = tempString.replace(",", ".");
 						refDistance = Double.parseDouble(tempString);	
-						IJ.log("Surrounding: Reference Distance = " + refDistance);
+						IJ.log("Surrounding: Reference Distance (calibrated units) = " + refDistance);
 					}else {
 						IJ.error("Surrounding Ref Distance missing in file.");
 						return false;
@@ -673,12 +673,12 @@ private boolean enterSettings() {
 	GenericDialog gd = new GenericDialog(PLUGINNAME + " on " + System.getProperty("os.name") + " - set parameters");	
 	//show Dialog-----------------------------------------------------------------
 	//.setInsets(top, left, bottom)
-	gd.setInsets(5,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021 JN Hansen", SuperHeadingFont);
+	gd.setInsets(5,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021-2022 JN Hansen", SuperHeadingFont);
 	gd.setInsets(5,0,0);		gd.addNumericField("Channel Nr (>= 1 & <= nr of channels) for quantification", channelID, 0);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
 	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size [voxel]", minSize, 0);
 	gd.setInsets(5,0,0);		gd.addChoice("Additionally exclude...", excludeOptions, excludeSelection);
-	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance", quantifySurroundings);	
+	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance (calibrated units, e.g. µm)", quantifySurroundings);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
 	
@@ -1704,7 +1704,7 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	return adipos;
 }
 
-ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c){
+ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c, String filePrefix){
 	if(keepAwake) stayAwake();
 	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
 	ImagePlus refImp2 = copyChannel(imp,c, false, false);
@@ -1732,7 +1732,6 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c)
 		}
 	}
 	
-	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>((int)Math.round((double)nrOfPoints/(double)minSize));
 	
 	int pc100 = nrOfPoints/100; if (pc100==0){pc100 = 1;}
 	int pc1000 = nrOfPoints/1000; if (pc1000==0){pc1000 = 1;}
@@ -1778,37 +1777,55 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c)
 			progress.addToBar(0.2/(rois.length));
 		}
 	}
+	progress.notifyMessage("Particle conversion done.", ProgressDialog.LOG);
 	
 	rm.reset();
 	pA = null;
 	preliminaryParticle = new ArrayList<AdipoPoint>(0);
+	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>(rois.length);
 	
-//	Point tempPoints [];
+	Point tempPoints [];
+	
+	ImagePlus SurrMapAverage = new ImagePlus();
+	ImagePlus SurrMapSD = new ImagePlus();
+	if(saveSurrMaps) {
+		SurrMapAverage = IJ.createHyperStack("Surr-Map Average", imp.getWidth(), imp.getHeight(), imp.getNChannels(), imp.getNSlices(), imp.getNFrames(), imp.getBitDepth());
+		SurrMapAverage.setCalibration(imp.getCalibration());
+		SurrMapSD = SurrMapAverage.duplicate();
+	}
 	
 	for(int r = 0; r < rois.length; r++) {
 		roi = rois [r];
-		
-		xStart = roi.getBounds().x - 1;
-		if(xStart < 0) xStart = 0;
-		xEnd = roi.getBounds().x + roi.getBounds().width + 1;
-		if(xEnd > imp.getWidth()-1)	xEnd = imp.getWidth()-1;
-		yStart = roi.getBounds().y - 1;
-		if(yStart < 0) yStart = 0;
-		yEnd = roi.getBounds().y + roi.getBounds().height + 1;
-		if(yEnd > imp.getHeight() -1)	yEnd = imp.getHeight()-1;
+				
+//		xStart = roi.getBounds().x - 1;
+//		if(xStart < 0) xStart = 0;
+//		xEnd = roi.getBounds().x + roi.getBounds().width + 1;
+//		if(xEnd > imp.getWidth()-1)	xEnd = imp.getWidth()-1;
+//		yStart = roi.getBounds().y - 1;
+//		if(yStart < 0) yStart = 0;
+//		yEnd = roi.getBounds().y + roi.getBounds().height + 1;
+//		if(yEnd > imp.getHeight() -1)	yEnd = imp.getHeight()-1;
 		
 		preliminaryParticle.ensureCapacity(roi.getContainedPoints().length);
-
-		for(int xi = xStart; xi <= xEnd; xi++) {
-			for(int yi = yStart; yi <= yEnd; yi++) {
-				if(roi.contains(xi, yi)) {
-					if(refImp.getStack().getVoxel(xi, yi, 0) > 0.0){
-						preliminaryParticle.add(new AdipoPoint(xi,yi,0,0, imp, c));
-						pointsAdded++;
-					}
-				}
-			}
+		
+		tempPoints = roi.getContainedPoints();
+		for(int tp = 0; tp < tempPoints.length; tp++) {
+			if(refImp.getStack().getVoxel(tempPoints[tp].x, tempPoints[tp].y, 0) > 0.0){
+				preliminaryParticle.add(new AdipoPoint(tempPoints[tp].x, tempPoints[tp].y,0,0, refImp2, 1));
+			}			
 		}
+		
+				
+//		for(int xi = xStart; xi <= xEnd; xi++) {
+//			for(int yi = yStart; yi <= yEnd; yi++) {
+//				if(roi.contains(xi, yi)) {
+//					if(refImp.getStack().getVoxel(xi, yi, 0) > 0.0){
+//						preliminaryParticle.add(new AdipoPoint(xi,yi,0,0, imp, c));
+//						pointsAdded++;
+//					}
+//				}
+//			}
+//		}
 		
 		//Analysis
 		preliminaryParticle.trimToSize();
@@ -1816,7 +1833,25 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c)
 		if(preliminaryParticle.size()>=minSize) {
 			included++;
 			if(!fuseParticles) {
+				progress.updateBarText("Making adipocyte: " + df3.format(((double)(r)/(double)(rois.length))*100) + "%");
 				adipos.add(new Adipocyte(preliminaryParticle, imp, channelID, quantifySurroundings, refDistance, roi));	
+				progress.updateBarText("Made adipocyte: " + df3.format(((double)(r)/(double)(rois.length))*100) + "%");		
+				
+				// Create Surroundings Maps
+				if(saveSurrMaps) {
+					for(int ci = 0; ci < imp.getNChannels(); ci++) {
+						if(ci == c-1) continue;
+						for(int j = 0; j < preliminaryParticle.size(); j++){
+							SurrMapAverage.getStack().setVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y,
+								imp.getStackIndex(ci+1, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1, 
+									adipos.get(adipos.size()-1).averageIntensitySurr[preliminaryParticle.get(j).t][ci]);
+							
+							SurrMapSD.getStack().setVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y,
+									imp.getStackIndex(ci+1, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1, 
+										adipos.get(adipos.size()-1).sdIntensitySurr[preliminaryParticle.get(j).t][ci]);
+						}
+					}
+				}
 			}else {
 				fusedParticles.addAll(preliminaryParticle);
 			}
@@ -1829,7 +1864,7 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c)
 			for(int j = 0; j < preliminaryParticle.size(); j++){
 //				try {
 					imp.getStack().setVoxel(preliminaryParticle.get(j).x,
-							preliminaryParticle.get(j).y, 
+							preliminaryParticle.get(j).y,
 							imp.getStackIndex(c, preliminaryParticle.get(j).z+1, 
 							preliminaryParticle.get(j).t+1)-1, 
 							refImp2.getStack().getVoxel(preliminaryParticle.get(j).x, 
@@ -1847,6 +1882,10 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c)
 		if(r%20==0){
 			progress.updateBarText("Reconstruction of particles complete: " + df3.format(((double)(r)/(double)(rois.length))*100) + "%");
 			progress.addToBar(0.2/(rois.length));
+//			progress.notifyMessage("Particle conversion done:" + df3.format(((double)(r)/(double)(rois.length))*100) + "%", ProgressDialog.LOG);
+//			if(r%60==0){
+//				IJ.log("Particle reconstruction done:" + df3.format(((double)(r)/(double)(rois.length))*100) + "%");				
+//			}
 		}
 	}
 	preliminaryParticle = null;			
@@ -1858,7 +1897,43 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c)
 		adipos.add(new Adipocyte(fusedParticles, imp, channelID, false, 0.0));
 		fusedParticles.clear();
 		fusedParticles = null;
-	}	
+	}
+	
+	if(saveSurrMaps) {
+//		String activeCs = "";
+		for(int ci = 0; ci < SurrMapAverage.getNChannels(); ci++) {
+			progress.updateBarText("Saving surroundings maps now... C" + (ci+1));
+			if(ci == c-1) continue;
+//			activeCs = "";
+//			for(int cii = 0; cii < SurrMapAverage.getNChannels(); cii++) {
+//				if(ci == cii) {
+//					activeCs += "1";					
+//				}else {
+//					activeCs += "0";
+//				}
+//			}
+//			SurrMapAverage.setActiveChannels(activeCs);
+//			SurrMapSD.setActiveChannels(activeCs);
+			
+			SurrMapAverage.setC(ci+1);
+			SurrMapSD.setC(ci+1);
+			
+			IJ.run(SurrMapAverage, "Fire","");
+			IJ.run(SurrMapSD, "Fire","");
+			
+//			IJ.saveAsTiff(SurrMapAverage,filePrefix+"_SurrAVG_C" + (ci+1) + ".tif");
+//			IJ.saveAsTiff(SurrMapSD,filePrefix+"_SurrSD_C" + (ci+1) + ".tif");
+			
+		}
+		
+		IJ.saveAsTiff(SurrMapAverage,filePrefix+"_SurrAVG.tif");
+		IJ.saveAsTiff(SurrMapSD,filePrefix+"_SurrSD.tif");
+		
+		SurrMapAverage.changes = false;
+		SurrMapSD.changes = false;
+		SurrMapAverage.close();
+		SurrMapSD.close();
+	}
 	return adipos;
 }
 
