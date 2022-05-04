@@ -752,7 +752,7 @@ private boolean enterSettings() {
 	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
 	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size (calibrated unit^2, e.g., µm2)", minSizeCalibrated, 2);
 	gd.setInsets(5,0,0);		gd.addChoice("Additionally exclude...", excludeOptions, excludeSelection);
-	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance (calibrated units, e.g., µm)", quantifySurroundings);	
+	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance (calibrated unit, e.g., µm)", quantifySurroundings);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
 	
