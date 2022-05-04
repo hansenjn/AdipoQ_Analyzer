@@ -83,7 +83,8 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	String ChosenNumberFormat = nrFormats[0];
 
 	int channelID = 1;
-	int minSize = 100;
+	double minSize = 100.0;
+	double minSizeCalibrated = 20.0;
 	boolean increaseRange, fuseParticles, quantifySurroundings, saveRois, saveSurrMaps = false;
 	double refDistance = 20.0;
 	
@@ -149,7 +150,7 @@ public void run(String arg) {
 		IJ.error("Preferences could not be loaded due to file error...");
 		return;
 	}
-
+		
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	//------------------------------processing------------------------------------
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -306,8 +307,7 @@ public void run(String arg) {
 			if(imp.getCalibration().pixelHeight != imp.getCalibration().pixelWidth) {
 				progress.notifyMessage("Task " + (task+1) + "/" + tasks + ": WARNING: Pixel width is not equal pixel height "
 						+ "- surface/outline calculation may be inaccurate.", ProgressDialog.NOTIFICATION);
-			}
-			
+			}			
 		   	//Check for problems with the image
 		   	
 		   	//Create Outputfilename
@@ -328,6 +328,13 @@ public void run(String arg) {
 			
 			filePrefix = dir[task] + filePrefix;
 		   	
+			//Determine pixelated particle size
+			{
+				//convert calibrated minSize (minSizeCalibrated) into pixelated minSize
+				minSize = (double)minSizeCalibrated / (double)imp.getCalibration().pixelWidth / (double)imp.getCalibration().pixelHeight;
+				progress.notifyMessage("Task " + (task+1) + ": Minimum size in " + imp.getCalibration().getUnit() + "^2: " + df6.format(minSizeCalibrated) 
+					+ " -> in pixel: " + df6.format(minSize), ProgressDialog.LOG);
+			}
 			
 		/******************************************************************
 		*** 						Processing							***	
@@ -544,6 +551,9 @@ private boolean importSettings() {
 	}	
 	
 	channelID = -1;
+	String readVersion = "none";
+	double tempVoxelWidth = 0.0;
+	double tempVoxelHeight = 0.0;
 	
 	//read individual channel settings
 	String tempString;
@@ -552,7 +562,7 @@ private boolean importSettings() {
 	try {
 		FileReader fr = new FileReader(settingsFile);
 		BufferedReader br = new BufferedReader(fr);
-		String line = "";							
+		String line = "";
 		reading: while(true){
 			try{
 				line = br.readLine();	
@@ -561,6 +571,19 @@ private boolean importSettings() {
 				}
 			}catch(Exception e){
 				break reading;
+			}
+			
+			if(line.contains("Plugin version:")) {
+				readVersion = line.substring(line.lastIndexOf("	")+1);
+				IJ.log("Loaded file comes from version " + readVersion);
+			}
+						
+			if(line.contains("Voxel width:")) {
+				tempVoxelWidth = Double.parseDouble(line.substring(line.lastIndexOf("	")+1));
+			}
+			
+			if(line.contains("Voxel height:")) {
+				tempVoxelHeight = Double.parseDouble(line.substring(line.lastIndexOf("	")+1));				
 			}
 			
 			if(line.contains("Channel Nr:")){
@@ -583,10 +606,50 @@ private boolean importSettings() {
 				
 				line = br.readLine();	
 				if(line.contains("Minimum particle size")){
-					tempString = line.substring(line.lastIndexOf("	")+1);
-					if(tempString.contains(",") && !tempString.contains("."))	tempString = tempString.replace(",", ".");
-					minSize = Integer.parseInt(tempString);	
-					IJ.log("Min particle size = " + minSize);
+					if(readVersion.equals("0.0.1") || readVersion.equals("0.0.2") || readVersion.equals("0.0.3") 
+							|| readVersion.equals("0.0.4") || readVersion.equals("0.0.5") || readVersion.equals("0.0.6")) {
+						tempString = line.substring(line.lastIndexOf("	")+1);
+						if(tempString.contains(",") && !tempString.contains("."))	tempString = tempString.replace(",", ".");
+						minSizeCalibrated = Double.parseDouble(tempString);
+						IJ.log("Min particle size (pixel) = " + df3.format(minSizeCalibrated));		
+						if(tempVoxelWidth == 0.0 || tempVoxelHeight == 0.0) {
+							GenericDialog gd = new GenericDialog(PLUGINNAME + " on " + System.getProperty("os.name") + " - set missing parameter");	
+							//show Dialog-----------------------------------------------------------------
+							gd.setInsets(5,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021-2022 JN Hansen", SuperHeadingFont);
+							gd.setInsets(5,0,0);		gd.addMessage("The loaded file stems from an outdated version of " + PLUGINNAME, InstructionsFont);
+							gd.setInsets(0,0,0);		gd.addMessage("Define the following parameter to ensure analysis with the correct settings:", InstructionsFont);
+							gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size (calibrated unit^2, e.g., µm2)", minSizeCalibrated, 2);							
+							
+							gd.showDialog();
+							//show Dialog-----------------------------------------------------------------
+
+							//read and process variables--------------------------------------------------	
+							{
+								minSizeCalibrated = gd.getNextNumber();
+							}
+							//read and process variables--------------------------------------------------
+							
+							if (gd.wasCanceled()) {
+								return false;
+							}
+							
+							
+							IJ.log("Manually defined: Min particle size (calibrated unit^2) = " + df6.format(minSizeCalibrated));		
+						}else {
+							minSizeCalibrated *= tempVoxelWidth * tempVoxelHeight;
+							IJ.log("Converted: Min particle size (calibrated unit^2) = " + df6.format(minSizeCalibrated));							
+						}
+					}else if (readVersion.equals("none")){
+						IJ.error("Version info missing in file.");
+						return false;
+					}else {
+						tempString = line.substring(0, line.lastIndexOf("	"));
+						tempString = tempString.substring(0, tempString.lastIndexOf("	"));
+						tempString = tempString.substring(tempString.lastIndexOf("	")+1);
+						if(tempString.contains(",") && !tempString.contains("."))	tempString = tempString.replace(",", ".");
+						minSizeCalibrated = Double.parseDouble(tempString);
+						IJ.log("Min particle size (calibrated unit^2) = " + df6.format(minSizeCalibrated));
+					}
 				}else {
 					IJ.error("Particle size info missing in file.");
 					return false;
@@ -623,7 +686,7 @@ private boolean importSettings() {
 						tempString = line.substring(line.lastIndexOf("	")+1);
 						if(tempString.contains(",") && !tempString.contains("."))	tempString = tempString.replace(",", ".");
 						refDistance = Double.parseDouble(tempString);	
-						IJ.log("Surrounding: Reference Distance (calibrated units) = " + refDistance);
+						IJ.log("Surrounding: Reference Distance (calibrated unit) = " + refDistance);
 					}else {
 						IJ.error("Surrounding Ref Distance missing in file.");
 						return false;
@@ -666,6 +729,10 @@ private boolean importSettings() {
 	}
 	
 	if(channelID != -1) {
+		if(readVersion.equals("none")) {
+			IJ.error("Loaded file contains no version information - loaded file incorrect.");
+			return false;
+		}
 		return true;
 	}else {
 		IJ.error("Unclear problem with loading preferences.");
@@ -683,9 +750,9 @@ private boolean enterSettings() {
 	gd.setInsets(5,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2021-2022 JN Hansen", SuperHeadingFont);
 	gd.setInsets(5,0,0);		gd.addNumericField("Channel Nr (>= 1 & <= nr of channels) for quantification", channelID, 0);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Increase range for connecting adipocytes", increaseRange);	
-	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size [voxel]", minSize, 0);
+	gd.setInsets(5,0,0);		gd.addNumericField("Minimum particle size (calibrated unit^2, e.g., µm2)", minSizeCalibrated, 2);
 	gd.setInsets(5,0,0);		gd.addChoice("Additionally exclude...", excludeOptions, excludeSelection);
-	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance (calibrated units, e.g. µm)", quantifySurroundings);	
+	gd.setInsets(5,0,0);		gd.addCheckbox("Quantify Surrounding | reference distance (calibrated units, e.g., µm)", quantifySurroundings);	
 	gd.setInsets(-23,100,0);		gd.addNumericField("", refDistance, 2);
 	gd.setInsets(5,0,0);		gd.addCheckbox("Fuse included particles into one for quantification", fuseParticles);	
 	
@@ -696,7 +763,7 @@ private boolean enterSettings() {
 	{
 		channelID = (int) gd.getNextNumber();
 		increaseRange = gd.getNextBoolean();
-		minSize = (int) gd.getNextNumber();
+		minSizeCalibrated = gd.getNextNumber();
 		excludeSelection = gd.getNextChoice();
 		quantifySurroundings = gd.getNextBoolean();
 		refDistance = gd.getNextNumber();
@@ -764,13 +831,13 @@ private void addSettingsBlockToPanel(TextPanel tp, Date startDate, Date endDate,
 			tp.append("	Increase range in particle detection:	FALSE");
 		}
 		
-		tp.append("	Minimum particle size [voxel]:	" + df0.format(minSize));
+		tp.append("	Minimum particle size (" + imp.getCalibration().getUnit() + "^2):	" + df6.format(minSizeCalibrated) + "	" + "Minimum particle size (px):	" + df6.format(minSize));
 		
 		tp.append("	Exclude option:	" + excludeSelection);
 		
 		if(quantifySurroundings){
 			tp.append("	Quantify Surrounding:	TRUE");
-			tp.append("	Surrounding: reference distance:	" + df6.format(refDistance));
+			tp.append("	Surrounding: reference distance(" + imp.getCalibration().getUnit() + "):	" + df6.format(refDistance));
 		}else{
 			tp.append("	Quantify Surrounding:	FALSE");
 			tp.append("");
