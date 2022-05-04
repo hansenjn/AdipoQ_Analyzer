@@ -411,17 +411,20 @@ public void run(String arg) {
 			TextRoi txtID;
 			double volume, surface, sphereRadius, sphereSurface;
 			imp.setOverlay(new Overlay());
+			RoiManager.getInstance().setVisible(false);
+			RoiManager.getInstance().reset();			
 			for(int i = 0; i < adipocytes.size(); i++) {
 				if(keepAwake) {
 					stayAwake();
 				}
 				{
-					//write ID into image
+					//write ID into image and save ROIs
 					txtID = new TextRoi((int)Math.round(adipocytes.get(i).centerX[0]), 
 							(int)Math.round(adipocytes.get(i).centerY[0]),
 							df0.format(i+1), RoiFont);
 					txtID.setStrokeColor(Color.WHITE);
-					imp.getOverlay().add(txtID);		
+					imp.getOverlay().add(txtID);
+					RoiManager.getInstance().addRoi(txtID);			
 				}
 				for(int t = 0; t < adipocytes.get(i).voxelNumber.length; t++) {
 					appText = name[task] + "	" + (i+1);
@@ -499,7 +502,11 @@ public void run(String arg) {
 			tp2.saveAs(filePrefix + "s.txt");
 
 			IJ.saveAsTiff(imp,filePrefix+"_RP.tif");
-						
+
+			RoiManager.getInstance().runCommand("Save", filePrefix+"_IDs.zip");
+			RoiManager.getInstance().reset();
+			RoiManager.getInstance().setVisible(true);
+			
 			progress.updateBarText("Finished ...");
 			
 			/******************************************************************
@@ -1735,15 +1742,16 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 	
 	int pc100 = nrOfPoints/100; if (pc100==0){pc100 = 1;}
 	int pc1000 = nrOfPoints/1000; if (pc1000==0){pc1000 = 1;}
-	int pointsAdded = 0;
+//	int pointsAdded = 0;
 	
-	ArrayList<AdipoPoint> preliminaryParticle, tempParticleFill, tempParticleDel;
+	ArrayList<AdipoPoint> preliminaryParticle;
+//	ArrayList<AdipoPoint> tempParticleFill, tempParticleDel;
 	ArrayList<AdipoPoint> fusedParticles = new ArrayList<AdipoPoint>(0);
 	if(fuseParticles) {
 		fusedParticles = new ArrayList<AdipoPoint>(nrOfPoints);
 	}
 	
-	int xStart, xEnd, yStart, yEnd;
+//	int xStart, xEnd, yStart, yEnd;
 	
 	int included = 0;
 
@@ -1786,12 +1794,19 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 	
 	Point tempPoints [];
 	
-	ImagePlus SurrMapAverage = new ImagePlus();
-	ImagePlus SurrMapSD = new ImagePlus();
+	ImagePlus [] SurrMapAverage = new ImagePlus [imp.getNChannels()];
+	ImagePlus [] SurrMapSD = new ImagePlus [imp.getNChannels()];
 	if(saveSurrMaps) {
-		SurrMapAverage = IJ.createHyperStack("Surr-Map Average", imp.getWidth(), imp.getHeight(), imp.getNChannels(), imp.getNSlices(), imp.getNFrames(), imp.getBitDepth());
-		SurrMapAverage.setCalibration(imp.getCalibration());
-		SurrMapSD = SurrMapAverage.duplicate();
+		for(int ci = 0; ci < SurrMapAverage.length; ci++) {
+			if(ci == c-1) {
+				SurrMapAverage [ci] = new ImagePlus();
+				SurrMapSD [ci] = new ImagePlus();
+				continue;
+			}
+			SurrMapAverage [ci] = IJ.createHyperStack("Surr-Map Average", imp.getWidth(), imp.getHeight(), 1, imp.getNSlices(), imp.getNFrames(), imp.getBitDepth());
+			SurrMapAverage [ci].setCalibration(imp.getCalibration());
+			SurrMapSD [ci] = SurrMapAverage [ci].duplicate();
+		}		
 	}
 	
 	for(int r = 0; r < rois.length; r++) {
@@ -1814,8 +1829,7 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 				preliminaryParticle.add(new AdipoPoint(tempPoints[tp].x, tempPoints[tp].y,0,0, refImp2, 1));
 			}			
 		}
-		
-				
+						
 //		for(int xi = xStart; xi <= xEnd; xi++) {
 //			for(int yi = yStart; yi <= yEnd; yi++) {
 //				if(roi.contains(xi, yi)) {
@@ -1842,12 +1856,12 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 					for(int ci = 0; ci < imp.getNChannels(); ci++) {
 						if(ci == c-1) continue;
 						for(int j = 0; j < preliminaryParticle.size(); j++){
-							SurrMapAverage.getStack().setVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y,
-								imp.getStackIndex(ci+1, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1, 
+							SurrMapAverage [ci].getStack().setVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y,
+								imp.getStackIndex(1, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1, 
 									adipos.get(adipos.size()-1).averageIntensitySurr[preliminaryParticle.get(j).t][ci]);
 							
-							SurrMapSD.getStack().setVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y,
-									imp.getStackIndex(ci+1, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1, 
+							SurrMapSD [ci].getStack().setVoxel(preliminaryParticle.get(j).x, preliminaryParticle.get(j).y,
+									imp.getStackIndex(1, preliminaryParticle.get(j).z+1, preliminaryParticle.get(j).t+1)-1, 
 										adipos.get(adipos.size()-1).sdIntensitySurr[preliminaryParticle.get(j).t][ci]);
 						}
 					}
@@ -1900,39 +1914,23 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 	}
 	
 	if(saveSurrMaps) {
-//		String activeCs = "";
-		for(int ci = 0; ci < SurrMapAverage.getNChannels(); ci++) {
+		for(int ci = 0; ci < SurrMapAverage.length; ci++) {
 			progress.updateBarText("Saving surroundings maps now... C" + (ci+1));
 			if(ci == c-1) continue;
-//			activeCs = "";
-//			for(int cii = 0; cii < SurrMapAverage.getNChannels(); cii++) {
-//				if(ci == cii) {
-//					activeCs += "1";					
-//				}else {
-//					activeCs += "0";
-//				}
-//			}
-//			SurrMapAverage.setActiveChannels(activeCs);
-//			SurrMapSD.setActiveChannels(activeCs);
+						
+			IJ.run(SurrMapAverage [ci], "Fire","");
+			IJ.run(SurrMapSD [ci], "Fire","");
 			
-			SurrMapAverage.setC(ci+1);
-			SurrMapSD.setC(ci+1);
-			
-			IJ.run(SurrMapAverage, "Fire","");
-			IJ.run(SurrMapSD, "Fire","");
-			
-//			IJ.saveAsTiff(SurrMapAverage,filePrefix+"_SurrAVG_C" + (ci+1) + ".tif");
-//			IJ.saveAsTiff(SurrMapSD,filePrefix+"_SurrSD_C" + (ci+1) + ".tif");
+			IJ.saveAsTiff(SurrMapAverage [ci],filePrefix+"_SurrAVG_C" + (ci+1) + ".tif");
+			IJ.saveAsTiff(SurrMapSD [ci],filePrefix+"_SurrSD_C" + (ci+1) + ".tif");
 			
 		}
-		
-		IJ.saveAsTiff(SurrMapAverage,filePrefix+"_SurrAVG.tif");
-		IJ.saveAsTiff(SurrMapSD,filePrefix+"_SurrSD.tif");
-		
-		SurrMapAverage.changes = false;
-		SurrMapSD.changes = false;
-		SurrMapAverage.close();
-		SurrMapSD.close();
+		for(int ci = 0; ci < SurrMapAverage.length; ci++) {
+			SurrMapAverage [ci].changes = false;
+			SurrMapSD [ci].changes = false;
+			SurrMapAverage [ci].close();
+			SurrMapSD [ci].close();	
+		}
 	}
 	return adipos;
 }
