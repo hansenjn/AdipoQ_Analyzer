@@ -1,6 +1,6 @@
 package adipoQ_analyzer_jnh;
 /** ===============================================================================
-* AdipoQ Analyzer Version 0.1.0
+* AdipoQ Analyzer Version 0.1.1
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package adipoQ_analyzer_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: January 12, 2021 (This Version: May 03, 2022)
+* Date: January 12, 2021 (This Version: May 29, 2022)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -42,7 +42,7 @@ import ij.text.*;
 public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "AdipoQ Analyzer";
-	static final String PLUGINVERSION = "0.1.0";
+	static final String PLUGINVERSION = "0.1.1";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -74,10 +74,14 @@ public class AdipoQAnalyzerMain implements PlugIn, Measurements {
 	final static String[] settingsMethod = {"manually enter preferences", "load preferences from existing AdipoQ Analyzer metadata file"};
 	String selectedSettingsVariant = settingsMethod [0];
 	
+	static final String[] inputVariant = {"binary mask or background-removed (background = 0)", "label image (object-specific intensity levels)"};
+	String chosenInput = inputVariant[0];
+	
 	static final String[] outputVariant = {"save as filename + suffix 'AQA'", "save as filename + suffix 'AQA' + date"};
 	String chosenOutputName = outputVariant[0];
 	boolean keepAwake = false;
 	
+	boolean inputIsLabelImage = false;	
 	
 	static final String[] nrFormats = {"US (0.00...)", "Germany (0,00...)"};
 	String ChosenNumberFormat = nrFormats[0];
@@ -110,10 +114,11 @@ public void run(String arg) {
 	
 	gd.setInsets(10,0,0);	gd.addChoice("Preferences: ", settingsMethod, selectedSettingsVariant);
 	
-	gd.setInsets(10,0,0);	gd.addMessage("GENERAL SETTINGS:", HeadingFont);	
+	gd.setInsets(10,0,0);	gd.addMessage("GENERAL SETTINGS:", HeadingFont);
+	gd.setInsets(5,0,0);	gd.addChoice("Segmented channel is ", inputVariant, chosenInput);
 	gd.setInsets(5,0,0);	gd.addChoice("Output image name: ", outputVariant, chosenOutputName);
 	gd.setInsets(5,0,0);	gd.addChoice("Output number format", nrFormats, nrFormats[0]);
-	gd.setInsets(5,0,0);	gd.addCheckbox("Save rois in 2D static mode", saveRois);
+	gd.setInsets(5,0,0);	gd.addCheckbox("Save rois in 2D static mode (time-consuming!)", saveRois);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Save maps for surrounding intensities", saveSurrMaps);
 	gd.setInsets(5,0,0);	gd.addCheckbox("Keep computer awake during analysis", keepAwake);
 	
@@ -123,6 +128,7 @@ public void run(String arg) {
 	//read and process variables--------------------------------------------------
 	selectedTaskVariant = gd.getNextChoice();
 	selectedSettingsVariant = gd.getNextChoice();
+	chosenInput = gd.getNextChoice();	
 	chosenOutputName = gd.getNextChoice();	
 	ChosenNumberFormat = gd.getNextChoice();
 	dfDialog.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.US));
@@ -150,7 +156,7 @@ public void run(String arg) {
 		IJ.error("Preferences could not be loaded due to file error...");
 		return;
 	}
-		
+	
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	//------------------------------processing------------------------------------
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -250,6 +256,12 @@ public void run(String arg) {
 		}
    	}
    	
+
+	if(saveSurrMaps && !quantifySurroundings) {
+		progress.notifyMessage("Surroundings Maps cannot be saved since surroundings are not set to be quantified!", ProgressDialog.NOTIFICATION);
+		saveSurrMaps = false;
+	}
+	
 	for(int task = 0; task < tasks; task++){
 		running: while(continueProcessing){
 			startDate = new Date();
@@ -344,9 +356,8 @@ public void run(String arg) {
 			progress.updateBarText("Analyze " + channelID + " ...");
 			ArrayList<Adipocyte> adipocytes = new ArrayList<Adipocyte>(0);
 			if(imp.getNSlices()==1 && imp.getNFrames()==1) {
-//				adipocytes = this.analyzeAdipocytesWithRoiManager2DStatic(imp, channelID);	
 //				adipocytes = this.analyzeAdipocytesIn2DWithWand(imp, channelID);
-				adipocytes = this.analyzeAdipocytesWithParticleManager(imp, channelID, filePrefix);
+				adipocytes = this.analyzeAdipocytesWithIn2D(imp, channelID, filePrefix, chosenInput.equals(inputVariant [1]));
 				if(saveRois) {
 					RoiManager.getInstance().runCommand("Save", filePrefix+"r.zip");
 					RoiManager.getInstance().reset();
@@ -1530,7 +1541,10 @@ private static void emptyChannel(ImagePlus imp, int channel){
 	}
 }
 
-
+/**
+ * @deprecated
+ * Method used in previous versions until method with ParticleAnalyzer was introduced that outperforms this method 
+ * */
 ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	if(keepAwake) stayAwake();
 	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
@@ -1778,11 +1792,17 @@ ArrayList<Adipocyte> analyzeAdipocytesIn2DWithWand (ImagePlus imp, int c){
 	return adipos;
 }
 
-ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c, String filePrefix){
+ArrayList<Adipocyte> analyzeAdipocytesWithIn2D (ImagePlus imp, int c, String filePrefix, boolean labelImage){
 	if(keepAwake) stayAwake();
-	ImagePlus refImp = copyChannelAsBinary(imp, c, false);
+	ImagePlus refImp;
+	if(labelImage){
+		progress.notifyMessage("Input is label image", ProgressDialog.LOG);
+		refImp = copyChannel(imp,c,false,false);
+	}else {
+		progress.notifyMessage("Input is binary or semibinary", ProgressDialog.LOG);
+		refImp = copyChannelAsBinary(imp, c, false);
+	}
 	ImagePlus refImp2 = copyChannel(imp,c, false, false);
-	emptyChannel(imp, c);
 	Prefs.blackBackground = true;
 	
 	//Reset ROIManager
@@ -1817,49 +1837,92 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 	if(fuseParticles) {
 		fusedParticles = new ArrayList<AdipoPoint>(nrOfPoints);
 	}
-	
-//	int xStart, xEnd, yStart, yEnd;
-	
+		
 	int included = 0;
 
-	
 	progress.updateBarText("Connecting " + nrOfPoints + " points ...");
 	Roi roi;
-	
-	int optionsForPA = ParticleAnalyzer.SHOW_NONE;	
-	if(!increaseRange) {
-		optionsForPA += ParticleAnalyzer.FOUR_CONNECTED;
-		optionsForPA += ParticleAnalyzer.INCLUDE_HOLES;	
-	}
-	optionsForPA += ParticleAnalyzer.ADD_TO_MANAGER;
-	if(excludeSelection.equals(excludeOptions[1]) || excludeSelection.equals(excludeOptions[2])){
-		optionsForPA += ParticleAnalyzer.EXCLUDE_EDGE_PARTICLES;
-	}
-	
-	ParticleAnalyzer pA = new ParticleAnalyzer(optionsForPA, 0, null, minSize, Integer.MAX_VALUE, 0.0, 1.0);
-//	pA.setup("", refImp);
-	pA.analyze(refImp);
-	
-//	refImp.show();
-//	new WaitForUserDialog("Test").show();
-//	refImp.hide();
-	
-	PolygonRoi rois [] = new PolygonRoi [rm.getRoisAsArray().length];
-	for(int rI = 0; rI < rm.getRoisAsArray().length; rI++) {
-		rois [rI] = (PolygonRoi) rm.getRoisAsArray()[rI];
-		if(rI%20==0){
-			progress.updateBarText("Converting particles: " + df3.format(((double)(rI)/(double)(rois.length))*100) + "%");
-			progress.addToBar(0.2/(rois.length));
+	PolygonRoi pRoi;
+	PolygonRoi rois [];
+	Point tempPoints [];
+			
+	if(labelImage){
+		//Go through image and retrieve ROIs with Wand tool, add the tools to the Manager, then retrieve an ROI array
+		Wand wand;
+		int wandMode = Wand.FOUR_CONNECTED;
+		if(increaseRange) {
+			wandMode = Wand.EIGHT_CONNECTED;
 		}
+		ArrayList<PolygonRoi> tempRois = new ArrayList<PolygonRoi>((int) (nrOfPoints/minSize));
+		for(int x = 0; x < refImp.getWidth(); x++){
+			for(int y = 0; y < refImp.getHeight(); y++){
+				if(refImp.getStack().getVoxel(x, y, 0) > 0.0){
+					wand = new Wand(refImp.getProcessor());
+					wand.autoOutline(x, y, 0.0, wandMode);
+					if (wand.npoints==0){
+						IJ.error("Wand error:"+x+"/"+y);
+					}
+					pRoi = new PolygonRoi(wand.xpoints, wand.ypoints, wand.npoints, Wand.allPoints()?Roi.FREEROI:Roi.TRACED_ROI);
+					tempRois.add(pRoi);
+					//delete from image
+					tempPoints = pRoi.getContainedPoints();
+					for(int tp = 0; tp < tempPoints.length; tp++) {
+						refImp.getStack().setVoxel(tempPoints[tp].x, tempPoints[tp].y, 0, 0.0);		
+					}
+				}
+			}
+		}
+		
+		refImp.changes = false;
+		refImp.close();		
+		refImp = copyChannel(imp,c,false,false);
+		
+		tempRois.trimToSize();
+		rois = new PolygonRoi [tempRois.size()];
+		for(int rI = 0; rI < tempRois.size(); rI++) {
+			rois [rI] = tempRois.get(rI);
+			if(rI%100==0){
+				progress.updateBarText("Converting particles: " + df3.format(((double)(rI)/(double)(rois.length))*100) + "%");
+				progress.addToBar(0.2/(rois.length));
+			}
+		}
+		tempRois.clear();
+		tempRois = null;
+	}else{
+		//Use Particle Analyzer to determine the ROIs
+		int optionsForPA = ParticleAnalyzer.SHOW_NONE;	
+		if(!increaseRange) {
+			optionsForPA += ParticleAnalyzer.FOUR_CONNECTED;
+			optionsForPA += ParticleAnalyzer.INCLUDE_HOLES;	
+		}
+		optionsForPA += ParticleAnalyzer.ADD_TO_MANAGER;
+		if(excludeSelection.equals(excludeOptions[1]) || excludeSelection.equals(excludeOptions[2])){
+			optionsForPA += ParticleAnalyzer.EXCLUDE_EDGE_PARTICLES;
+		}
+		
+		ParticleAnalyzer pA = new ParticleAnalyzer(optionsForPA, 0, null, minSize, Integer.MAX_VALUE, 0.0, 1.0);
+		pA.analyze(refImp);
+				
+//		refImp.show();
+//		new WaitForUserDialog("Test").show();
+//		refImp.hide();
+		
+		rois = new PolygonRoi [rm.getRoisAsArray().length];
+		for(int rI = 0; rI < rm.getRoisAsArray().length; rI++) {
+			rois [rI] = (PolygonRoi) rm.getRoisAsArray()[rI];
+			if(rI%20==0){
+				progress.updateBarText("Converting particles: " + df3.format(((double)(rI)/(double)(rois.length))*100) + "%");
+				progress.addToBar(0.2/(rois.length));
+			}
+		}
+		pA = null;
 	}
-	progress.notifyMessage("Particle conversion done.", ProgressDialog.LOG);
-	
+	progress.notifyMessage("Particles obtained. Detected " + rois.length + " particles!", ProgressDialog.LOG);
 	rm.reset();
-	pA = null;
+	
 	preliminaryParticle = new ArrayList<AdipoPoint>(0);
 	ArrayList<Adipocyte> adipos = new ArrayList<Adipocyte>(rois.length);
 	
-	Point tempPoints [];
 	
 	ImagePlus [] SurrMapAverage = new ImagePlus [imp.getNChannels()];
 	ImagePlus [] SurrMapSD = new ImagePlus [imp.getNChannels()];
@@ -1876,18 +1939,11 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 		}		
 	}
 	
+	//Empty channel first, then write back
+	emptyChannel(imp, c);
 	for(int r = 0; r < rois.length; r++) {
 		roi = rois [r];
 				
-//		xStart = roi.getBounds().x - 1;
-//		if(xStart < 0) xStart = 0;
-//		xEnd = roi.getBounds().x + roi.getBounds().width + 1;
-//		if(xEnd > imp.getWidth()-1)	xEnd = imp.getWidth()-1;
-//		yStart = roi.getBounds().y - 1;
-//		if(yStart < 0) yStart = 0;
-//		yEnd = roi.getBounds().y + roi.getBounds().height + 1;
-//		if(yEnd > imp.getHeight() -1)	yEnd = imp.getHeight()-1;
-		
 		preliminaryParticle.ensureCapacity(roi.getContainedPoints().length);
 		
 		tempPoints = roi.getContainedPoints();
@@ -1896,17 +1952,6 @@ ArrayList<Adipocyte> analyzeAdipocytesWithParticleManager (ImagePlus imp, int c,
 				preliminaryParticle.add(new AdipoPoint(tempPoints[tp].x, tempPoints[tp].y,0,0, refImp2, 1));
 			}			
 		}
-						
-//		for(int xi = xStart; xi <= xEnd; xi++) {
-//			for(int yi = yStart; yi <= yEnd; yi++) {
-//				if(roi.contains(xi, yi)) {
-//					if(refImp.getStack().getVoxel(xi, yi, 0) > 0.0){
-//						preliminaryParticle.add(new AdipoPoint(xi,yi,0,0, imp, c));
-//						pointsAdded++;
-//					}
-//				}
-//			}
-//		}
 		
 		//Analysis
 		preliminaryParticle.trimToSize();
